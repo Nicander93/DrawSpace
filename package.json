@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "electron-vite dev",
-    "postinstall": "node node_modules/electron/install.js && electron-builder install-app-deps",
+    "postinstall": "node node_modules/electron/install.js",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
@@ -19,14 +19,12 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
     "lint": "eslint .",
-    "rebuild:node": "npm rebuild better-sqlite3",
-    "rebuild:electron": "electron-builder install-app-deps",
     "package:win": "npm run build && electron-builder --win nsis",
     "package:dir": "npm run build && electron-builder --dir"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
-    "better-sqlite3": "^12.2.0",
+    "better-sqlite3": "13.0.2",
     "chokidar": "^4.0.3",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
@@ -57,6 +55,7 @@
     "appId": "com.canvasdesk.app",
     "productName": "画伴 CanvasDesk",
     "asar": true,
+    "npmRebuild": false,
     "asarUnpack": [
       "node_modules/better-sqlite3/**/*"
     ],

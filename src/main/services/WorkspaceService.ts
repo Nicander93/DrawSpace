@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { basename, extname } from "node:path";
-import type { CanvasDocument, DocumentListResult, Workspace, WorkspaceProviderType } from "@shared/types";
+import type { DocumentListResult, Workspace, WorkspaceProviderType } from "@shared/types";
 import { DatabaseService } from "../database/DatabaseService";
 import { LocalStorageProvider } from "../storage/LocalStorageProvider";
 import type { StorageProvider, StorageWatchEvent } from "../storage/StorageProvider";

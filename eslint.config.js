@@ -12,5 +12,15 @@ export default tseslint.config(
       "react-hooks": reactHooks
     },
     rules: reactHooks.configs.recommended.rules
+  },
+  {
+    files: ["tests/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        location: "readonly",
+        window: "readonly"
+      }
+    }
   }
 );

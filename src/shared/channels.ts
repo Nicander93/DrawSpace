@@ -33,5 +33,5 @@ export const IPC_CHANNELS = {
   windowMaximize: "window:maximize",
   windowClose: "window:close",
   appCloseRequested: "app:close-requested",
-  appReadyToClose: "app:ready-to-close"
+  appCloseResponded: "app:close-responded",
 } as const;

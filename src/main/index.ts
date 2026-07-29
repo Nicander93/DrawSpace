@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -9,7 +10,7 @@ import {
   protocol,
   shell
 } from "electron";
-import { documentIdSchema } from "@shared/schemas";
+import { appCloseResponseSchema, documentIdSchema } from "@shared/schemas";
 import { IPC_CHANNELS } from "@shared/channels";
 import { DatabaseService } from "./database/DatabaseService";
 import { registerIpcHandlers } from "./ipc/registerIpcHandlers";
@@ -18,6 +19,7 @@ import { RecoveryService } from "./services/RecoveryService";
 import { ThumbnailService } from "./services/ThumbnailService";
 import { WorkspaceService } from "./services/WorkspaceService";
 import { AppLogger } from "./services/AppLogger";
+import { CloseHandshakeController } from "./lifecycle/CloseHandshakeController";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -56,19 +58,27 @@ const createWindow = (): void => {
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
   });
-  let closeRequested = false;
+  const closeController = new CloseHandshakeController(randomUUID);
   mainWindow.on("close", (event) => {
-    if (closeRequested || mainWindow?.isDestroyed()) {
+    if (mainWindow?.isDestroyed()) {
+      return;
+    }
+    if (closeController.isWindowCloseAllowed()) {
       return;
     }
     event.preventDefault();
-    closeRequested = true;
-    mainWindow?.webContents.send("app:close-requested");
-    setTimeout(() => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.destroy();
+    const request = closeController.begin("window-close");
+    if (request) mainWindow?.webContents.send(IPC_CHANNELS.appCloseRequested, request);
+  });
+  mainWindow.webContents.on("ipc-message", (_event, channel, ...args) => {
+    if (channel === IPC_CHANNELS.appCloseResponded) {
+      const parsedResponse = appCloseResponseSchema.safeParse(args[0]);
+      if (!parsedResponse.success) return;
+      if (closeController.respond(parsedResponse.data) === "proceed") {
+        mainWindow?.close();
       }
-    }, 5_000);
+      return;
+    }
   });
   mainWindow.on("closed", () => {
     mainWindow = null;
@@ -228,7 +238,7 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("before-quit", () => {
+app.on("will-quit", () => {
   logger?.info("app.quit");
   void workspaceService?.dispose();
   database?.close();

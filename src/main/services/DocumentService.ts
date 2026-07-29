@@ -12,7 +12,8 @@ import type {
   SaveResult
 } from "@shared/types";
 import { DatabaseService } from "../database/DatabaseService";
-import type { StorageEntry } from "../storage/StorageProvider";
+import type { StorageEntry, StorageWriteResult } from "../storage/StorageProvider";
+import { StorageError } from "../storage/StorageError";
 import { RecoveryService } from "./RecoveryService";
 import { ThumbnailService } from "./ThumbnailService";
 import { WorkspaceService } from "./WorkspaceService";
@@ -127,14 +128,60 @@ export class DocumentService {
     }
 
     const fileData = serializeScene(input.sceneData);
-    await provider.write(document.relativePath, fileData);
+    // The content hash check protects against same-mtime changes; the
+    // provider version check closes the read-before-write window.
+    const storageVersion = input.expectedVersion.split(":").slice(0, 2).join(":");
+    let writeResult: StorageWriteResult;
+    try {
+      writeResult = await provider.write(document.relativePath, fileData, {
+        expectedVersion: storageVersion
+      });
+    } catch (error) {
+      if (error instanceof StorageError && error.code === "VERSION_CONFLICT") {
+        const latestData = await provider.read(document.relativePath);
+        if (hashData(latestData) !== currentHash) {
+          this.logger?.warn("document.conflict.race", { documentId: document.id });
+          return this.createConflictCopy(document, input.sceneData);
+        }
+        const latestEntry = await provider.stat(document.relativePath);
+        if (!latestEntry?.version) throw error;
+        try {
+          writeResult = await provider.write(document.relativePath, fileData, {
+            expectedVersion: latestEntry.version
+          });
+        } catch (retryError) {
+          if (retryError instanceof StorageError && retryError.code === "VERSION_CONFLICT") {
+            const finalData = await provider.read(document.relativePath);
+            if (hashData(finalData) !== currentHash) {
+              this.logger?.warn("document.conflict.race", { documentId: document.id });
+              return this.createConflictCopy(document, input.sceneData);
+            }
+          }
+          throw retryError;
+        }
+        this.logger?.info("document.save.retry", { documentId: document.id });
+        return this.saveAfterProviderWrite(document, fileData, writeResult);
+      }
+      if (error instanceof Error && error.message === "文件已被外部修改") {
+        this.logger?.warn("document.conflict.race", { documentId: document.id });
+        return this.createConflictCopy(document, input.sceneData);
+      }
+      throw error;
+    }
 
-    const savedStat = await this.requireStat(document.relativePath);
+    return this.saveAfterProviderWrite(document, fileData, writeResult);
+  }
+
+  private async saveAfterProviderWrite(
+    document: CanvasDocument,
+    fileData: Uint8Array,
+    writeResult: StorageWriteResult
+  ): Promise<SaveResult> {
     const contentHash = hashData(fileData);
     const savedDocument = this.database.updateDocumentFile({
       documentId: document.id,
-      fileSize: savedStat.size ?? fileData.byteLength,
-      modifiedAt: savedStat.modifiedAt ?? Date.now(),
+      fileSize: writeResult.size,
+      modifiedAt: writeResult.modifiedAt,
       contentHash
     });
     await this.recoveryService.discard(document.id);
@@ -142,7 +189,7 @@ export class DocumentService {
     return {
       status: "saved",
       document: savedDocument,
-      version: buildVersion(savedStat, contentHash)
+      version: `${writeResult.modifiedAt}:${writeResult.size}:${contentHash}`
     };
   }
 

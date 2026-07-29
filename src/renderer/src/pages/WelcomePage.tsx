@@ -1,5 +1,4 @@
 import { Cloud, FolderOpen, Plus, ShieldCheck } from "lucide-react";
-import { useEffect } from "react";
 import type { Workspace } from "@shared/types";
 import { Brand } from "../components/Brand";
 import { WindowControls } from "../components/WindowControls";
@@ -12,13 +11,6 @@ interface WelcomePageProps {
 export function WelcomePage({ unavailableWorkspace }: WelcomePageProps) {
   const { chooseWorkspace, error } = useWorkspaceStore();
 
-  useEffect(
-    () =>
-      window.desktopApi.lifecycle.onCloseRequested(() => {
-        window.desktopApi.lifecycle.readyToClose();
-      }),
-    []
-  );
 
   return (
     <div className="welcome-page">

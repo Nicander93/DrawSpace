@@ -9,8 +9,9 @@ export interface StorageEntry {
 }
 
 export interface StorageWriteResult {
-  version?: string;
-  modifiedAt?: number;
+  version: string;
+  modifiedAt: number;
+  size: number;
 }
 
 export interface StorageWatchEvent {

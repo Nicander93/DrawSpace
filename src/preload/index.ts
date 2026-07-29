@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { IPC_CHANNELS } from "@shared/channels";
-import type { DesktopApi } from "@shared/types";
+import type { AppCloseResponse, DesktopApi } from "@shared/types";
 
 const desktopApi: DesktopApi = {
   workspace: {
@@ -93,11 +93,11 @@ const desktopApi: DesktopApi = {
   },
   lifecycle: {
     onCloseRequested: (listener) => {
-      const handler = (): void => listener();
+      const handler = (_event: Electron.IpcRendererEvent, request: Parameters<typeof listener>[0]): void => listener(request);
       ipcRenderer.on(IPC_CHANNELS.appCloseRequested, handler);
       return () => ipcRenderer.removeListener(IPC_CHANNELS.appCloseRequested, handler);
     },
-    readyToClose: () => ipcRenderer.send(IPC_CHANNELS.appReadyToClose)
+    respondToClose: (response: AppCloseResponse) => ipcRenderer.send(IPC_CHANNELS.appCloseResponded, response)
   }
 };
 

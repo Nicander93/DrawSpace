@@ -8,10 +8,11 @@ import {
   Sun,
   Monitor
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WindowControls } from "../components/WindowControls";
 import { useWorkspaceStore } from "../stores/workspaceStore";
+import { useAppCloseHandler } from "../features/lifecycle/AppCloseContext";
 
 type Theme = "light" | "dark" | "system";
 
@@ -22,12 +23,8 @@ export function SettingsPage() {
     (localStorage.getItem("canvasdesk-theme") as Theme | null) ?? "system"
   );
 
-  useEffect(
-    () =>
-      window.desktopApi.lifecycle.onCloseRequested(() => {
-        window.desktopApi.lifecycle.readyToClose();
-      }),
-    []
+  useAppCloseHandler((request) =>
+    window.desktopApi.lifecycle.respondToClose({ requestId: request.requestId, decision: "proceed" })
   );
 
   const changeTheme = (nextTheme: Theme): void => {

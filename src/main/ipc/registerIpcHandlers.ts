@@ -274,9 +274,6 @@ export const registerIpcHandlers = (services: IpcServices): void => {
   ipcMain.on(IPC_CHANNELS.windowClose, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();
   });
-  ipcMain.on(IPC_CHANNELS.appReadyToClose, (event) => {
-    BrowserWindow.fromWebContents(event.sender)?.destroy();
-  });
 };
 
 const zodArrayBuffer = (value: unknown): ArrayBuffer => {

@@ -6,6 +6,11 @@
 npm run typecheck
 npm test
 npm run lint
+```
+
+Electron E2E 为可选验收项，运行方式：
+
+```bash
 npm run test:e2e
 ```
 
@@ -20,10 +25,15 @@ npm run test:e2e
 - 创建、重命名、复制、删除和恢复
 - 外部修改冲突副本
 - 异常会话恢复快照
+- 保存协调器的 5 秒防抖、30 秒最长等待、失败和 dispose
+- App 关闭握手的 requestId 去重、取消复位和过期响应
+- editorStore 多标签顺序、状态隔离和恢复
 
 后 3 项使用 better-sqlite3 集成运行时。完整执行 `npm install` 后自动运行；依赖安装不完整时会明确标记为 skipped。
 
-`npm run test:e2e` 会先构建应用，再使用 Playwright 启动 Electron，在临时工作区验证创建、保存、重启、回收站、外部修改冲突和异常恢复主线。
+`npm run test:e2e` 会先构建应用，再使用 Playwright 启动 Electron，在临时工作区验证创建、保存、重启、回收站、外部修改冲突、异常恢复、多标签和原生剪贴板主线。
+
+如果 Electron 在启动阶段报告 `crashpad_client_win.cc:867 not connected` 或窗口进程立即退出，属于运行时环境阻塞；此时不应将 E2E 结果当作业务断言失败，也不影响本地 typecheck、单元/集成测试和构建验证。
 
 ## 手工核心流程
 

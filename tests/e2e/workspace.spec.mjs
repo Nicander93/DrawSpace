@@ -9,7 +9,7 @@ test("创建、保存、回收站、冲突和异常恢复主流程", async () =>
 
   try {
     application = await electron.launch({
-      args: ["."],
+      args: [".", "--disable-gpu", "--disable-crash-reporter", "--no-sandbox"],
       env: {
         ...process.env,
         CANVASDESK_E2E_WORKSPACE: workspacePath
@@ -120,7 +120,7 @@ test("创建、保存、回收站、冲突和异常恢复主流程", async () =>
 
     await application.close();
     application = await electron.launch({
-      args: ["."],
+      args: [".", "--disable-gpu", "--disable-crash-reporter", "--no-sandbox"],
       env: {
         ...process.env,
         CANVASDESK_E2E_WORKSPACE: workspacePath

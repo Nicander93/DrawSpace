@@ -1,5 +1,15 @@
 export type WorkspaceProviderType = "local" | "nutstore";
 
+export interface AppCloseRequest {
+  requestId: string;
+  reason: "window-close" | "app-quit";
+}
+
+export interface AppCloseResponse {
+  requestId: string;
+  decision: "proceed" | "cancel";
+}
+
 export interface Workspace {
   id: string;
   name: string;
@@ -180,7 +190,7 @@ export interface DesktopApi {
     close(): void;
   };
   lifecycle: {
-    onCloseRequested(listener: () => void): () => void;
-    readyToClose(): void;
+    onCloseRequested(listener: (request: AppCloseRequest) => void): () => void;
+    respondToClose(response: AppCloseResponse): void;
   };
 }

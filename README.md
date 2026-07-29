@@ -13,8 +13,9 @@
 - 拖拽导入、文件选择导入和同名文件自动避让
 - 回收站、恢复、永久删除和清空回收站
 - 嵌入官方 Excalidraw 编辑器，支持图片和 BinaryFiles
-- 800ms 防抖自动保存、窗口失焦保存和手动保存
-- 原子写入、外部修改检测和冲突副本
+- 多画布标签、标签切换/排序/关闭和跨文档工作区
+- 停止编辑 5 秒自动保存、持续编辑 30 秒最长等待和手动保存
+- 串行保存队列、故障安全原子替换、外部修改检测和冲突副本
 - 10 秒恢复快照与异常会话恢复提示
 - Excalidraw、PNG、SVG 导出
 - 浅色、深色主题
@@ -50,7 +51,7 @@ src/
       components/   工作区通用组件
       features/     Excalidraw 适配层
       pages/        欢迎页、工作区、编辑器和设置
-      stores/       工作区状态
+      stores/       工作区与编辑器标签状态
       styles/       设计系统和页面样式
   shared/           进程共享类型、通道和 Zod Schema
 docs/               架构、数据、可靠性和已知问题
@@ -65,13 +66,13 @@ docs/               架构、数据、可靠性和已知问题
 
 ## 安装依赖
 
-依赖中包含 Electron 下载和 better-sqlite3 原生模块重建，耗时取决于网络和本机环境：
+依赖中包含 Electron 下载，耗时取决于网络和本机环境。better-sqlite3 固定使用 13.0.2，Windows 使用其 Node-API 预编译模块，正常安装不需要 Visual Studio 或 node-gyp：
 
 ```bash
 npm install
 ```
 
-`postinstall` 会调用 electron-builder，为当前 Electron 版本重建 better-sqlite3。
+`postinstall` 只负责安装 Electron 二进制；打包配置也会跳过不必要的原生模块重建。
 
 ## 启动
 
@@ -87,6 +88,11 @@ npm run dev
 npm run typecheck
 npm test
 npm run lint
+```
+
+Electron E2E 为可选验收项：
+
+```bash
 npm run test:e2e
 ```
 

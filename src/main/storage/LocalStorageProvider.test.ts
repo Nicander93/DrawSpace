@@ -1,8 +1,9 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { LocalStorageProvider } from "./LocalStorageProvider";
+import { StorageError } from "./StorageError";
 
 describe("LocalStorageProvider", () => {
   let workspacePath: string;
@@ -52,6 +53,8 @@ describe("LocalStorageProvider", () => {
     expect(await readFile(resolve(workspacePath, "画布.excalidraw"), "utf8")).toBe(
       "second"
     );
+    const names = await readdir(workspacePath);
+    expect(names.some((name) => name.includes("canvasdesk-backup") || name.endsWith(".tmp"))).toBe(false);
   });
 
   it("预期版本不一致时停止覆盖", async () => {
@@ -59,14 +62,26 @@ describe("LocalStorageProvider", () => {
     const currentStat = await provider.stat("画布.excalidraw");
     await writeFile(resolve(workspacePath, "画布.excalidraw"), "external");
 
-    await expect(
-      provider.write("画布.excalidraw", new TextEncoder().encode("local"), {
-        expectedVersion: currentStat?.version
-      })
-    ).rejects.toThrow("外部修改");
+    const error = await provider.write(
+      "画布.excalidraw",
+      new TextEncoder().encode("local"),
+      { expectedVersion: currentStat?.version }
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(StorageError);
+    expect((error as StorageError).code).toBe("VERSION_CONFLICT");
     expect(await readFile(resolve(workspacePath, "画布.excalidraw"), "utf8")).toBe(
       "external"
     );
+  });
+
+  it("recovers an interrupted backup before the next write", async () => {
+    await provider.write("画布.excalidraw", new TextEncoder().encode("old"));
+    await writeFile(resolve(workspacePath, ".画布.excalidraw.canvasdesk-backup"), "backup");
+    await rm(resolve(workspacePath, "画布.excalidraw"));
+
+    await provider.write("画布.excalidraw", new TextEncoder().encode("new"));
+    expect(await readFile(resolve(workspacePath, "画布.excalidraw"), "utf8")).toBe("new");
+    await expect(readdir(workspacePath)).resolves.not.toContain(".画布.excalidraw.canvasdesk-backup");
   });
 
   it("递归扫描时排除内部和隐藏目录", async () => {

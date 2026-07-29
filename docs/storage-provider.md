@@ -32,8 +32,11 @@ node_modules/
 2. 写入完整内容
 3. 对文件执行 `fsync`
 4. 关闭临时文件
-5. 使用 rename 替换正式文件
-6. 失败时删除临时文件
+5. 目标存在时先 rename 到随机 `.bak`
+6. 使用 rename 将完整临时文件放到正式路径
+7. 成功后删除 `.bak`；替换失败时恢复 `.bak`，并清理临时文件
+
+Windows 上不使用 `copyFile(temp, target)` 覆盖正式文件。写入前会处理上次中断留下的 backup：目标缺失时恢复 backup，目标存在时删除 stale backup。版本冲突通过结构化 `StorageError` 的 `VERSION_CONFLICT` code 识别。
 
 写入前可传入 `expectedVersion`。版本由 mtime 和文件大小组成，用于阻止检查之后发生的并发覆盖。
 

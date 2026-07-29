@@ -1,12 +1,35 @@
 import { useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import type { RecoveryItem } from "@shared/types";
 import { RecoveryDialog } from "./components/RecoveryDialog";
-import { EditorPage } from "./pages/EditorPage";
+import { AppCloseProvider } from "./features/lifecycle/AppCloseContext";
+import { EditorWorkspacePage } from "./pages/EditorWorkspacePage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { WelcomePage } from "./pages/WelcomePage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { useWorkspaceStore } from "./stores/workspaceStore";
+
+function AppShell() {
+  const location = useLocation();
+  const isEditor = location.pathname.startsWith("/editor/");
+
+  return (
+    <div className="app-shell-surfaces">
+      <section
+        className={`app-shell-surface ${!isEditor ? "is-visible" : ""}`}
+        aria-hidden={isEditor}
+      >
+        <WorkspacePage visible={!isEditor} />
+      </section>
+      <section
+        className={`app-shell-surface ${isEditor ? "is-visible" : ""}`}
+        aria-hidden={!isEditor}
+      >
+        <EditorWorkspacePage visible={isEditor} />
+      </section>
+    </div>
+  );
+}
 
 export default function App() {
   const { workspace, initialized, initialize } = useWorkspaceStore();
@@ -43,14 +66,18 @@ export default function App() {
   }
 
   if (!workspace?.isAvailable) {
-    return <WelcomePage unavailableWorkspace={workspace} />;
+    return (
+      <AppCloseProvider>
+        <WelcomePage unavailableWorkspace={workspace} />
+      </AppCloseProvider>
+    );
   }
 
   return (
-    <>
+    <AppCloseProvider>
       <Routes>
-        <Route path="/" element={<WorkspacePage />} />
-        <Route path="/editor/:documentId" element={<EditorPage />} />
+        <Route path="/" element={<AppShell />} />
+        <Route path="/editor/:documentId" element={<AppShell />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -60,6 +87,6 @@ export default function App() {
           onItemsChange={setRecoveryItems}
         />
       )}
-    </>
+    </AppCloseProvider>
   );
 }

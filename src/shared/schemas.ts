@@ -2,6 +2,11 @@ import { z } from "zod";
 
 export const documentIdSchema = z.string().uuid();
 
+export const appCloseResponseSchema = z.object({
+  requestId: z.string().uuid(),
+  decision: z.enum(["proceed", "cancel"])
+});
+
 export const workspaceProviderTypeSchema = z.enum(["local", "nutstore"]);
 
 export const documentListQuerySchema = z.object({
@@ -42,6 +47,7 @@ export const fileNameSchema = z
   .trim()
   .min(1, "名称不能为空")
   .max(180, "名称不能超过 180 个字符")
+  // eslint-disable-next-line no-control-regex
   .refine((value) => !/[<>:"/\\|?*\u0000-\u001f]/.test(value), "名称包含非法字符")
   .refine((value) => !/[. ]$/.test(value), "名称不能以点或空格结尾");
 

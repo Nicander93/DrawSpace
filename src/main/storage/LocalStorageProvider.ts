@@ -18,6 +18,7 @@ import type {
   StorageWatchEvent,
   StorageWriteResult
 } from "./StorageProvider";
+import { StorageError } from "./StorageError";
 
 const EXCLUDED_DIRECTORIES = new Set([
   ".canvasdesk",
@@ -146,10 +147,16 @@ export class LocalStorageProvider implements StorageProvider {
     const absolutePath = this.resolvePath(relativePath);
     const parentPath = dirname(absolutePath);
     await mkdir(parentPath, { recursive: true });
+    const backupPath = resolve(
+      parentPath,
+      `.${basename(absolutePath)}.canvasdesk-backup`
+    );
+    await this.recoverStaleBackup(absolutePath, backupPath);
 
     if (options?.expectedVersion) {
       const currentEntry = await this.stat(relativePath);
       if (currentEntry?.version !== options.expectedVersion) {
+        throw new StorageError("VERSION_CONFLICT", "鏂囦欢宸茶澶栭儴淇敼");
         throw new Error("文件已被外部修改");
       }
     }
@@ -171,11 +178,29 @@ export class LocalStorageProvider implements StorageProvider {
         await rename(temporaryPath, absolutePath);
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code;
-        if (code !== "EPERM" && code !== "EEXIST") {
-          throw error;
+        if (code !== "EPERM" && code !== "EEXIST") throw error;
+
+        // Windows may refuse replacing an existing file while it is open.
+        // Move the old file aside first, then rename the fully fsynced temp
+        // file into place. Never copy the temp file over the live document.
+        let hasBackup = false;
+        try {
+          await rename(absolutePath, backupPath);
+          hasBackup = true;
+          await rename(temporaryPath, absolutePath);
+          await unlink(backupPath).catch(() => undefined);
+        } catch (replacementError) {
+          if (hasBackup) {
+            await unlink(absolutePath).catch(() => undefined);
+            await rename(backupPath, absolutePath).catch(() => undefined);
+          }
+          const code = (replacementError as NodeJS.ErrnoException).code;
+          throw new StorageError(
+            code === "EPERM" || code === "EACCES" ? "FILE_BUSY" : "REPLACE_FAILED",
+            replacementError instanceof Error ? replacementError.message : "文件替换失败",
+            replacementError
+          );
         }
-        await copyFile(temporaryPath, absolutePath);
-        await unlink(temporaryPath).catch(() => undefined);
       }
     } catch (error) {
       await unlink(temporaryPath).catch(() => undefined);
@@ -185,8 +210,29 @@ export class LocalStorageProvider implements StorageProvider {
     const writtenStat = await stat(absolutePath);
     return {
       version: `${writtenStat.mtimeMs}:${writtenStat.size}`,
-      modifiedAt: writtenStat.mtimeMs
+      modifiedAt: writtenStat.mtimeMs,
+      size: writtenStat.size
     };
+  }
+
+  private async recoverStaleBackup(
+    absolutePath: string,
+    backupPath: string
+  ): Promise<void> {
+    try {
+      await stat(backupPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      throw error;
+    }
+
+    try {
+      await stat(absolutePath);
+      await unlink(backupPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      await rename(backupPath, absolutePath);
+    }
   }
 
   async stat(relativePath: string): Promise<StorageEntry | null> {

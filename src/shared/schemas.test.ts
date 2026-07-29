@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  appCloseResponseSchema,
   excalidrawFileSchema,
   fileNameSchema,
   relativeDirectorySchema
 } from "./schemas";
 
 describe("IPC 参数校验", () => {
+  it("只接受当前关闭握手的有效响应结构", () => {
+    expect(appCloseResponseSchema.safeParse({ requestId: "stale", decision: "proceed" }).success).toBe(false);
+    expect(appCloseResponseSchema.safeParse({ requestId: "00000000-0000-0000-0000-000000000000", decision: "cancel" }).success).toBe(true);
+  });
+
   it("拒绝路径穿越和绝对路径", () => {
     expect(relativeDirectorySchema.safeParse("../secret").success).toBe(false);
     expect(relativeDirectorySchema.safeParse("/etc").success).toBe(false);

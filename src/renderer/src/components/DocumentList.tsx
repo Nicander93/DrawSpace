@@ -1,20 +1,25 @@
-import { FileWarning, MoreHorizontal, Star } from "lucide-react";
+import { FileWarning, Star } from "lucide-react";
 import type { CanvasDocument } from "@shared/types";
 import { formatRelativeTime } from "./DocumentCard";
+import { DocumentQuickActions } from "./DocumentQuickActions";
 
 interface DocumentListProps {
   documents: CanvasDocument[];
   selectedDocumentId: string | null;
-  onSelect(documentId: string): void;
+  selectedDocumentIds?: string[];
+  onSelect(documentId: string, event: React.MouseEvent): void;
   onOpen(documentId: string): void;
+  onToggleFavorite(documentId: string): void;
   onContextMenu(event: React.MouseEvent, documentId: string): void;
 }
 
 export function DocumentList({
   documents,
   selectedDocumentId,
+  selectedDocumentIds = selectedDocumentId ? [selectedDocumentId] : [],
   onSelect,
   onOpen,
+  onToggleFavorite,
   onContextMenu
 }: DocumentListProps) {
   return (
@@ -28,12 +33,12 @@ export function DocumentList({
       {documents.map((document) => (
         <div
           className={`document-list__row ${
-            selectedDocumentId === document.id ? "is-selected" : ""
+          selectedDocumentIds.includes(document.id) ? "is-selected" : ""
           }`}
           key={document.id}
           role="button"
           tabIndex={0}
-          onClick={() => onSelect(document.id)}
+          onClick={(event) => onSelect(document.id, event)}
           onDoubleClick={() => onOpen(document.id)}
           onContextMenu={(event) => onContextMenu(event, document.id)}
           onKeyDown={(event) => {
@@ -51,13 +56,7 @@ export function DocumentList({
           </span>
           <span title={document.relativePath}>{document.relativePath}</span>
           <span>{formatRelativeTime(document.modifiedAt)}</span>
-          <button
-            type="button"
-            aria-label="更多操作"
-            onClick={(event) => onContextMenu(event, document.id)}
-          >
-            <MoreHorizontal size={17} />
-          </button>
+          <DocumentQuickActions isFavorite={document.isFavorite} onToggleFavorite={() => onToggleFavorite(document.id)} onContextMenu={(event) => onContextMenu(event, document.id)} />
         </div>
       ))}
     </div>

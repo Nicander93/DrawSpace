@@ -15,7 +15,7 @@ import {
   Save,
   Star
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import type {
   CanvasDocument,
@@ -27,7 +27,11 @@ import {
   ExcalidrawAdapter
 } from "../features/editor/ExcalidrawAdapter";
 import { WindowControls } from "../components/WindowControls";
+import { UnsavedDocumentDialog } from "../components/UnsavedDocumentDialog";
 import { useWorkspaceStore } from "../stores/workspaceStore";
+import { useEditorStore } from "../stores/editorStore";
+import { DocumentSaveCoordinator } from "../features/editor/DocumentSaveCoordinator";
+import type { SaveOutcome, SaveSnapshot } from "../features/editor/saveTypes";
 
 type SaveStatus = "saved" | "saving" | "dirty" | "error" | "conflict";
 
@@ -37,11 +41,25 @@ interface EditorLocationState {
 
 const adapter = new ExcalidrawAdapter();
 
-export function EditorPage() {
-  const { documentId } = useParams();
+interface EditorPageProps {
+  documentId?: string;
+  embedded?: boolean;
+  active?: boolean;
+  onClose?: () => void;
+  registerSave?: (documentId: string, save: () => Promise<boolean>) => () => void;
+  registerClose?: (documentId: string, close: () => Promise<void>) => () => void;
+  registerDiscard?: (documentId: string, discard: () => void) => () => void;
+}
+
+export function EditorPage({ documentId: embeddedDocumentId, embedded = false, active = true, onClose, registerSave, registerClose, registerDiscard }: EditorPageProps) {
+  const routeParams = useParams();
+  const documentId = embeddedDocumentId ?? routeParams.documentId;
   const location = useLocation();
   const navigate = useNavigate();
   const refreshWorkspace = useWorkspaceStore((state) => state.refresh);
+  const updateDocumentMetadata = useEditorStore((state) => state.updateDocumentMetadata);
+  const replaceEditorDocument = useEditorStore((state) => state.replaceDocumentId);
+  const updateSaveStatus = useEditorStore((state) => state.updateSaveStatus);
   const locationState = location.state as EditorLocationState | null;
   const initialContent =
     locationState?.initialContent &&
@@ -58,6 +76,9 @@ export function EditorPage() {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [pendingLeave, setPendingLeave] = useState<(() => void | Promise<void>) | null>(null);
+  const [leaveBusy, setLeaveBusy] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState(document?.name ?? "");
   const sceneRef = useRef<ExcalidrawFile | null>(
     documentContent?.sceneData ?? null
@@ -67,10 +88,33 @@ export function EditorPage() {
   const sessionIdRef = useRef(documentContent?.sessionId ?? "");
   const dirtyRef = useRef(false);
   const revisionRef = useRef(0);
-  const savePromiseRef = useRef<Promise<boolean> | null>(null);
-  const ignoreChangesUntilRef = useRef(Date.now() + 250);
-  const saveTimerRef = useRef<number | null>(null);
+  const saveCoreRef = useRef<((snapshot: SaveSnapshot) => Promise<boolean>) | null>(null);
+  const saveOutcomeRef = useRef<SaveOutcome | null>(null);
+  const editorReadyRef = useRef(false);
   const mountedRef = useRef(true);
+  const saveCoordinator = useMemo(
+    () => new DocumentSaveCoordinator({
+      documentId: documentId ?? "",
+      getScene: () => sceneRef.current,
+      getExpectedVersion: () => versionRef.current,
+      executeSave: async (snapshot) => {
+        const save = saveCoreRef.current;
+        if (!save) return { status: "failed" as const, message: "保存器尚未初始化" };
+        saveOutcomeRef.current = null;
+        const saved = await save(snapshot);
+        if (saveOutcomeRef.current) return saveOutcomeRef.current;
+        return saved ? { status: "saved" as const } : { status: "failed" as const, message: "保存失败" };
+      },
+      onStatusChange: (status, error) => {
+        if (!mountedRef.current) return;
+        setSaveStatus(status);
+        setSaveError(error);
+      }
+    }),
+    [documentId]
+  );
+
+  useEffect(() => () => saveCoordinator.dispose(), [saveCoordinator]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -93,7 +137,7 @@ export function EditorPage() {
         sessionIdRef.current = content.sessionId;
         dirtyRef.current = false;
         revisionRef.current = 0;
-        ignoreChangesUntilRef.current = Date.now() + 250;
+        editorReadyRef.current = false;
       })
       .catch((error) => {
         setSaveError(error instanceof Error ? error.message : "无法打开画布");
@@ -129,33 +173,23 @@ export function EditorPage() {
     }
   }, [document]);
 
-  const performSave = useCallback(
-    async (force = false): Promise<boolean> => {
+  const performSaveOnce = useCallback(
+    async (force = false, snapshot?: SaveSnapshot): Promise<boolean> => {
       if (!document || !sceneRef.current) return false;
-      if (!dirtyRef.current && !force) return true;
-      if (!dirtyRef.current && force) return true;
-      if (savePromiseRef.current) {
-        const previousSaveSucceeded = await savePromiseRef.current;
-        if (force && dirtyRef.current) {
-          return performSave(true);
-        }
-        return previousSaveSucceeded && !dirtyRef.current;
-      }
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-      }
-      const revisionToSave = revisionRef.current;
-      const sceneDataToSave = sceneRef.current;
+      if (!dirtyRef.current && !force && !snapshot) return true;
+      if (!dirtyRef.current && force && !snapshot) return true;
+      const revisionToSave = snapshot?.revision ?? revisionRef.current;
+      const sceneDataToSave = snapshot?.sceneData ?? sceneRef.current;
       const saveOperation = (async (): Promise<boolean> => {
         setSaveStatus("saving");
         setSaveError(null);
         const result = await window.desktopApi.documents.save({
           documentId: document.id,
           sceneData: sceneDataToSave,
-          expectedVersion: versionRef.current
+          expectedVersion: snapshot?.expectedVersion ?? versionRef.current
         });
         if (result.status === "conflict") {
+          saveOutcomeRef.current = { status: "conflict", persisted: false, message: result.message };
           dirtyRef.current = revisionRef.current !== revisionToSave;
           setSaveStatus("conflict");
           setSaveError(result.message);
@@ -163,6 +197,8 @@ export function EditorPage() {
           let conflictContent = await window.desktopApi.documents.open(
             result.conflictDocument.id
           );
+          let conflictStatus: SaveStatus = "conflict";
+          let conflictError: string | null = result.message;
           if (dirtyRef.current && sceneRef.current) {
             const latestResult = await window.desktopApi.documents.save({
               documentId: conflictContent.document.id,
@@ -177,8 +213,24 @@ export function EditorPage() {
                 version: latestResult.version
               };
               dirtyRef.current = false;
+              conflictStatus = "saved";
+              conflictError = null;
+            } else {
+              conflictStatus = "error";
+              conflictError = latestResult.message;
+              await saveRecoverySnapshot().catch(() => undefined);
             }
           }
+          replaceEditorDocument(document.id, {
+            documentId: conflictContent.document.id,
+            name: conflictContent.document.name,
+            relativePath: conflictContent.document.relativePath,
+            isFavorite: conflictContent.document.isFavorite
+          }, conflictStatus, conflictError);
+          // The tab id replacement remounts this pane. Let the replacement
+          // pane own the newly opened conflict session instead of closing it
+          // from the old pane's unmount cleanup.
+          sessionIdRef.current = "";
           setDocumentContent(conflictContent);
           setDocument(conflictContent.document);
           setNameDraft(conflictContent.document.name);
@@ -187,7 +239,7 @@ export function EditorPage() {
           versionRef.current = conflictContent.version;
           sessionIdRef.current = conflictContent.sessionId;
           revisionRef.current = 0;
-          ignoreChangesUntilRef.current = Date.now() + 250;
+          editorReadyRef.current = false;
           navigate(`/editor/${result.conflictDocument.id}`, {
             replace: true,
             state: { initialContent: conflictContent }
@@ -201,18 +253,8 @@ export function EditorPage() {
         void saveThumbnail();
         return true;
       })();
-      savePromiseRef.current = saveOperation;
       try {
         const saved = await saveOperation;
-        if (dirtyRef.current && saved) {
-          if (force) {
-            savePromiseRef.current = null;
-            return performSave(true);
-          }
-          saveTimerRef.current = window.setTimeout(() => {
-            void performSave();
-          }, 120);
-        }
         return saved && !dirtyRef.current;
       } catch (error) {
         const message = error instanceof Error ? error.message : "保存失败";
@@ -220,20 +262,47 @@ export function EditorPage() {
         setSaveError(message);
         await saveRecoverySnapshot().catch(() => undefined);
         return false;
-      } finally {
-        savePromiseRef.current = null;
       }
     },
-    [document, navigate, saveRecoverySnapshot, saveThumbnail]
+    [document, navigate, replaceEditorDocument, saveRecoverySnapshot, saveThumbnail]
   );
 
+  saveCoreRef.current = (snapshot) => performSaveOnce(true, snapshot);
+
+  const performSave = useCallback((force = false): Promise<boolean> => {
+    const reason = force ? "manual" : "auto-debounce";
+    return saveCoordinator.requestSave(reason).then((outcome) =>
+      outcome.status === "saved" || outcome.status === "noop"
+    );
+  }, [saveCoordinator]);
+
   useEffect(() => {
-    const saveOnBlur = (): void => {
-      if (dirtyRef.current) void performSave(true);
-    };
-    window.addEventListener("blur", saveOnBlur);
-    return () => window.removeEventListener("blur", saveOnBlur);
-  }, [performSave]);
+    if (!embedded || !document || !registerSave) return;
+    return registerSave(document.id, () => performSave(true));
+  }, [document, embedded, performSave, registerSave]);
+
+  const closeSession = useCallback(async () => {
+    if (sessionIdRef.current) {
+      await window.desktopApi.sessions.close(sessionIdRef.current);
+      sessionIdRef.current = "";
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!embedded || !document || !registerClose) return;
+    return registerClose(document.id, closeSession);
+  }, [closeSession, document, embedded, registerClose]);
+
+  const discardChanges = useCallback(() => {
+    dirtyRef.current = false;
+    saveCoordinator.dispose();
+    setSaveStatus("saved");
+  }, [saveCoordinator]);
+
+  useEffect(() => {
+    if (!embedded || !document || !registerDiscard) return;
+    return registerDiscard(document.id, discardChanges);
+  }, [discardChanges, document, embedded, registerDiscard]);
 
   useEffect(() => {
     const recoveryTimer = window.setInterval(() => {
@@ -244,19 +313,71 @@ export function EditorPage() {
     return () => window.clearInterval(recoveryTimer);
   }, [saveRecoverySnapshot]);
 
-  const returnToWorkspace = useCallback(async () => {
-    const saved = await performSave(true);
-    if (!saved && dirtyRef.current) {
+  const finishLeave = useCallback(async (continueAction: () => void | Promise<void>) => {
+    await closeSession();
+    await continueAction();
+  }, [closeSession]);
+
+  const requestLeaveDocument = useCallback(async (continueAction: () => void | Promise<void>) => {
+    if (saveStatus === "saving") {
+      const saved = await performSave(true);
+      if (saved && !dirtyRef.current) {
+        await finishLeave(continueAction);
+        return;
+      }
+    }
+    if (dirtyRef.current || saveStatus === "error" || saveStatus === "conflict") {
+      setLeaveError(saveError);
+      setPendingLeave(() => continueAction);
       return;
     }
-    if (sessionIdRef.current) {
-      await window.desktopApi.sessions.close(sessionIdRef.current);
-    }
-    await refreshWorkspace();
-    navigate("/");
-  }, [navigate, performSave, refreshWorkspace]);
+    await finishLeave(continueAction);
+  }, [finishLeave, performSave, saveError, saveStatus]);
+
+  const saveAndLeave = useCallback(() => {
+    if (!pendingLeave) return;
+    setLeaveBusy(true);
+    void performSave(true).then(async (saved) => {
+      if (!saved || dirtyRef.current) {
+        setLeaveError(saveError ?? "保存失败，请重试或选择不保存");
+        return;
+      }
+      const action = pendingLeave;
+      setPendingLeave(null);
+      await finishLeave(action);
+    }).catch((error) => {
+      setLeaveError(error instanceof Error ? error.message : "保存失败，请重试或选择不保存");
+    }).finally(() => setLeaveBusy(false));
+  }, [finishLeave, pendingLeave, performSave, saveError]);
+
+  const discardAndLeave = useCallback(() => {
+    if (!pendingLeave) return;
+    const action = pendingLeave;
+    setPendingLeave(null);
+    discardChanges();
+    void window.desktopApi.recovery.discard(document?.id ?? "").catch(() => undefined)
+      .then(() => finishLeave(action));
+  }, [discardChanges, document?.id, finishLeave, pendingLeave]);
+
+  const cancelLeave = useCallback(() => {
+    if (leaveBusy) return;
+    setPendingLeave(null);
+    setLeaveError(null);
+  }, [leaveBusy]);
+
+  const returnToWorkspace = useCallback(async () => {
+    await requestLeaveDocument(async () => {
+      await refreshWorkspace();
+      navigate("/");
+    });
+  }, [navigate, refreshWorkspace, requestLeaveDocument]);
+
+  const closeEmbeddedDocument = useCallback(async () => {
+    await requestLeaveDocument(() => onClose?.());
+  }, [onClose, requestLeaveDocument]);
 
   useEffect(() => {
+    if (!active) return;
     const handleKeyboard = (event: KeyboardEvent): void => {
       const isModifier = event.ctrlKey || event.metaKey;
       if (isModifier && event.shiftKey && event.key.toLowerCase() === "s") {
@@ -270,38 +391,56 @@ export function EditorPage() {
         event.preventDefault();
         void performSave(true);
       }
-      if (isModifier && event.key.toLowerCase() === "w") {
+      if (isModifier && event.key.toLowerCase() === "w" && !embedded) {
         event.preventDefault();
         void returnToWorkspace();
       }
     };
-    window.addEventListener("keydown", handleKeyboard);
-    return () => window.removeEventListener("keydown", handleKeyboard);
-  }, [document, performSave, returnToWorkspace]);
+    window.addEventListener("keydown", handleKeyboard, true);
+    return () => window.removeEventListener("keydown", handleKeyboard, true);
+  }, [active, closeEmbeddedDocument, document, embedded, onClose, performSave, returnToWorkspace]);
 
-  useEffect(
-    () =>
-      window.desktopApi.lifecycle.onCloseRequested(() => {
-        void (async () => {
-          const saved = await performSave(true);
-          if (!saved && dirtyRef.current) {
-            await saveRecoverySnapshot().catch(() => undefined);
-          } else if (sessionIdRef.current) {
-            await window.desktopApi.sessions
-              .close(sessionIdRef.current)
-              .catch(() => undefined);
-          }
-          window.desktopApi.lifecycle.readyToClose();
-        })();
-      }),
-    [performSave, saveRecoverySnapshot]
-  );
+  useEffect(() => {
+    if (!embedded || !document) return;
+    const handleCloseRequest = (event: Event): void => {
+      const requestedId = (event as CustomEvent<string>).detail;
+      if (requestedId === document.id) void closeEmbeddedDocument();
+    };
+    window.addEventListener("canvasdesk:request-close", handleCloseRequest);
+    return () => window.removeEventListener("canvasdesk:request-close", handleCloseRequest);
+  }, [closeEmbeddedDocument, document, embedded]);
+
+  useEffect(() => {
+    if (!embedded || !document) return;
+    const handleRenameRequest = (event: Event): void => {
+      if ((event as CustomEvent<string>).detail === document.id) {
+        setIsRenaming(true);
+      }
+    };
+    window.addEventListener("canvasdesk:request-rename", handleRenameRequest);
+    return () => window.removeEventListener("canvasdesk:request-rename", handleRenameRequest);
+  }, [document, embedded]);
+
+  useEffect(() => {
+    if (!document) return;
+    updateDocumentMetadata({
+      documentId: document.id,
+      name: document.name,
+      relativePath: document.relativePath,
+      isFavorite: document.isFavorite
+    });
+  }, [document, updateDocumentMetadata]);
+
+  useEffect(() => {
+    if (document) updateSaveStatus(document.id, saveStatus, saveError);
+  }, [document, saveError, saveStatus, updateSaveStatus]);
 
   useEffect(
     () => () => {
-      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
       if (dirtyRef.current) {
         void saveRecoverySnapshot();
+      } else if (sessionIdRef.current) {
+        void window.desktopApi.sessions.close(sessionIdRef.current).catch(() => undefined);
       }
     },
     [saveRecoverySnapshot]
@@ -316,16 +455,11 @@ export function EditorPage() {
     const scene = { elements, appState, files };
     sceneRuntimeRef.current = scene;
     sceneRef.current = adapter.fromScene(scene);
-    if (Date.now() < ignoreChangesUntilRef.current) {
-      return;
-    }
+    if (!editorReadyRef.current) return;
     dirtyRef.current = true;
     revisionRef.current += 1;
+    saveCoordinator.markChanged();
     setSaveStatus("dirty");
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(() => {
-      void performSave();
-    }, 800);
   };
 
   const toggleFavorite = async (): Promise<void> => {
@@ -334,6 +468,7 @@ export function EditorPage() {
       document.id
     );
     setDocument(updatedDocument);
+    await refreshWorkspace();
   };
 
   const commitRename = async (): Promise<void> => {
@@ -351,6 +486,7 @@ export function EditorPage() {
       );
       setDocument(updatedDocument);
       setNameDraft(updatedDocument.name);
+      await refreshWorkspace();
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "重命名失败");
     } finally {
@@ -412,13 +548,13 @@ export function EditorPage() {
   const StatusIcon = saveStatusContent.icon;
 
   return (
-    <div className="editor-page">
+    <div className={`editor-page ${embedded ? "editor-page--embedded" : ""}`}>
       <header className="editor-topbar">
         <div className="editor-topbar__drag-region" />
         <button
           className="editor-back"
           type="button"
-          onClick={() => void returnToWorkspace()}
+          onClick={() => (embedded && onClose ? void closeEmbeddedDocument() : void returnToWorkspace())}
         >
           <ArrowLeft size={18} />
           <span>工作区</span>
@@ -534,10 +670,15 @@ export function EditorPage() {
           initialData={adapter.toInitialData(documentContent.sceneData)}
           excalidrawAPI={(api) => {
             sceneRuntimeRef.current = adapter.getScene(api);
+            const initialScene = sceneRuntimeRef.current;
+            if (initialScene) sceneRef.current = adapter.fromScene(initialScene);
+            editorReadyRef.current = true;
+            saveCoordinator.markBaseline();
           }}
           onChange={handleSceneChange}
           langCode="zh-CN"
           name={document.name}
+          viewModeEnabled={!active}
           theme={documentContent.sceneData.appState.theme === "dark" ? "dark" : "light"}
           UIOptions={{
             canvasActions: {
@@ -548,6 +689,16 @@ export function EditorPage() {
           }}
         />
       </div>
+      {pendingLeave && document && (
+        <UnsavedDocumentDialog
+          documentName={document.name}
+          error={leaveError}
+          busy={leaveBusy}
+          onSave={saveAndLeave}
+          onDiscard={discardAndLeave}
+          onCancel={cancelLeave}
+        />
+      )}
     </div>
   );
 }

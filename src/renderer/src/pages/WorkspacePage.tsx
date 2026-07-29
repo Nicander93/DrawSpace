@@ -6,7 +6,7 @@ import {
   Trash2,
   Upload
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { CanvasDocument, DocumentSort } from "@shared/types";
 import { DocumentCard } from "../components/DocumentCard";
@@ -14,11 +14,15 @@ import { DocumentContextMenu } from "../components/DocumentContextMenu";
 import { DocumentList } from "../components/DocumentList";
 import { EmptyState } from "../components/EmptyState";
 import { Modal } from "../components/Modal";
+import { MoveDocumentDialog } from "../components/MoveDocumentDialog";
+import { MoveDocumentsDialog } from "../components/MoveDocumentsDialog";
 import { QuickActions } from "../components/QuickActions";
 import { StoragePanel } from "../components/StoragePanel";
 import { WorkspaceSidebar } from "../components/WorkspaceSidebar";
 import { WorkspaceTopbar } from "../components/WorkspaceTopbar";
 import { useWorkspaceStore } from "../stores/workspaceStore";
+import { useEditorStore } from "../stores/editorStore";
+import { useAppCloseHandler } from "../features/lifecycle/AppCloseContext";
 
 type DialogState =
   | { type: "rename"; document: CanvasDocument }
@@ -41,7 +45,7 @@ const pageTitles = {
   trash: "回收站"
 } as const;
 
-export function WorkspacePage() {
+export function WorkspacePage({ visible = true }: { visible?: boolean }) {
   const navigate = useNavigate();
   const {
     workspace,
@@ -58,6 +62,7 @@ export function WorkspacePage() {
     pageNum,
     pageSize,
     selectedDocumentId,
+    selectedDocumentIds,
     refresh,
     rescan,
     setFilter,
@@ -65,8 +70,12 @@ export function WorkspacePage() {
     setSearch,
     setView,
     setPageNum,
-    setSelectedDocumentId
+    setSelectedDocumentId,
+    selectDocument,
+    selectAllDocuments
   } = useWorkspaceStore();
+  const updateEditorMetadata = useEditorStore((state) => state.updateDocumentMetadata);
+  const openEditorDocument = useEditorStore((state) => state.openDocument);
   const [searchDraft, setSearchDraft] = useState(search);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [dialog, setDialog] = useState<DialogState>(null);
@@ -80,6 +89,7 @@ export function WorkspacePage() {
   } | null>(null);
   const [restoreConflictDocument, setRestoreConflictDocument] =
     useState<CanvasDocument | null>(null);
+  const [batchMoveOpen, setBatchMoveOpen] = useState(false);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -95,12 +105,25 @@ export function WorkspacePage() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  useEffect(
-    () =>
-      window.desktopApi.lifecycle.onCloseRequested(() => {
-        window.desktopApi.lifecycle.readyToClose();
-      }),
-    []
+  useEffect(() => {
+    const openTabs = useEditorStore.getState().tabs;
+    const documentsById = new Map(documents.map((document) => [document.id, document]));
+    openTabs.forEach((tab) => {
+      const document = documentsById.get(tab.documentId);
+      if (document) {
+        updateEditorMetadata({
+          documentId: document.id,
+          name: document.name,
+          relativePath: document.relativePath,
+          isFavorite: document.isFavorite
+        });
+      }
+    });
+  }, [documents, updateEditorMetadata]);
+
+  useAppCloseHandler(
+    (request) => window.desktopApi.lifecycle.respondToClose({ requestId: request.requestId, decision: "proceed" }),
+    visible
   );
 
   useEffect(
@@ -178,6 +201,7 @@ export function WorkspacePage() {
   );
 
   useEffect(() => {
+    if (!visible) return undefined;
     const handleKeyboard = (event: KeyboardEvent): void => {
       const isModifier = event.ctrlKey || event.metaKey;
       if (isModifier && event.key.toLowerCase() === "n") {
@@ -189,6 +213,11 @@ export function WorkspacePage() {
       } else if (isModifier && event.key.toLowerCase() === "f") {
         event.preventDefault();
         document.querySelector<HTMLInputElement>(".workspace-search input")?.focus();
+      } else if (isModifier && event.key.toLowerCase() === "a") {
+        const target = event.target as HTMLElement | null;
+        if (target?.matches("input, textarea, [contenteditable='true']")) return;
+        event.preventDefault();
+        selectAllDocuments();
       } else if (event.key === "Delete" && activeDocument && !activeDocument.isDeleted) {
         event.preventDefault();
         void moveToTrash(activeDocument);
@@ -209,7 +238,9 @@ export function WorkspacePage() {
     createDocument,
     importDocuments,
     moveToTrash,
-    setSelectedDocumentId
+    selectAllDocuments,
+    setSelectedDocumentId,
+    visible
   ]);
 
   if (!workspace) {
@@ -259,7 +290,8 @@ export function WorkspacePage() {
         await window.desktopApi.documents.copy(contextDocument.id);
         setToast("副本已创建");
       } else if (action === "favorite") {
-        await window.desktopApi.documents.toggleFavorite(contextDocument.id);
+        const updated = await window.desktopApi.documents.toggleFavorite(contextDocument.id);
+        updateEditorMetadata({ documentId: updated.id, name: updated.name, relativePath: updated.relativePath, isFavorite: updated.isFavorite });
       } else if (action === "reveal") {
         await window.desktopApi.documents.reveal(contextDocument.id);
       } else if (action === "export") {
@@ -290,10 +322,12 @@ export function WorkspacePage() {
     setSubmitting(true);
     try {
       if (dialog.type === "rename") {
-        await window.desktopApi.documents.rename(dialog.document.id, dialogValue);
+        const updated = await window.desktopApi.documents.rename(dialog.document.id, dialogValue);
+        updateEditorMetadata({ documentId: updated.id, name: updated.name, relativePath: updated.relativePath, isFavorite: updated.isFavorite });
         setToast("画布已重命名");
       } else if (dialog.type === "move") {
-        await window.desktopApi.documents.move(dialog.document.id, dialogValue);
+        const updated = await window.desktopApi.documents.move(dialog.document.id, dialogValue);
+        updateEditorMetadata({ documentId: updated.id, name: updated.name, relativePath: updated.relativePath, isFavorite: updated.isFavorite });
         setToast("画布已移动");
       } else if (dialog.type === "delete") {
         await window.desktopApi.documents.deletePermanently(dialog.document.id);
@@ -338,6 +372,28 @@ export function WorkspacePage() {
   const displayedDocuments =
     filter === "home" && !searchDraft ? documents.slice(0, 5) : documents;
   const isHome = filter === "home" && !searchDraft;
+  const selectedDocuments = documents.filter((document) => selectedDocumentIds.includes(document.id));
+
+  const toggleSelectedFavorites = async (): Promise<void> => {
+    await Promise.all(selectedDocuments.filter((document) => !document.isDeleted).map((document) => window.desktopApi.documents.toggleFavorite(document.id)));
+    setToast(`已更新 ${selectedDocuments.length} 个画布的收藏状态`);
+    await refresh();
+  };
+
+  const trashSelectedDocuments = async (): Promise<void> => {
+    await Promise.all(selectedDocuments.filter((document) => !document.isDeleted).map((document) => window.desktopApi.documents.trash(document.id)));
+    setSelectedDocumentId(null);
+    setToast(`已移入 ${selectedDocuments.length} 个画布到回收站`);
+    await refresh();
+  };
+
+  const openSelectedDocuments = (): void => {
+    for (const document of selectedDocuments) {
+      openEditorDocument({ documentId: document.id, name: document.name, relativePath: document.relativePath, isFavorite: document.isFavorite });
+    }
+    const lastDocument = selectedDocuments.at(-1);
+    if (lastDocument) navigate(`/editor/${lastDocument.id}`);
+  };
 
   return (
     <div
@@ -433,6 +489,17 @@ export function WorkspacePage() {
               </div>
             )}
 
+            {selectedDocuments.length > 0 && filter !== "trash" && (
+              <div className="selection-toolbar">
+                <strong>已选择 {selectedDocuments.length} 个画布</strong>
+                <button className="button" type="button" onClick={() => void toggleSelectedFavorites()}>批量收藏</button>
+                <button className="button" type="button" onClick={() => setBatchMoveOpen(true)}>批量移动</button>
+                <button className="button" type="button" onClick={openSelectedDocuments}>批量打开</button>
+                <button className="button button--danger-outline" type="button" onClick={() => void trashSelectedDocuments()}>批量移入回收站</button>
+                <button className="button" type="button" onClick={() => setSelectedDocumentId(null)}>取消选择</button>
+              </div>
+            )}
+
             {error && (
               <div className="inline-error">
                 <AlertCircle size={17} />
@@ -463,8 +530,9 @@ export function WorkspacePage() {
                     key={document.id}
                     document={document}
                     selected={selectedDocumentId === document.id}
-                    onSelect={() => setSelectedDocumentId(document.id)}
+                    onSelect={(event) => selectDocument(document.id, event.shiftKey ? "range" : event.ctrlKey || event.metaKey ? "toggle" : "replace")}
                     onOpen={() => void openDocument(document.id)}
+                    onToggleFavorite={() => void (async () => { const updated = await window.desktopApi.documents.toggleFavorite(document.id); updateEditorMetadata({ documentId: updated.id, name: updated.name, relativePath: updated.relativePath, isFavorite: updated.isFavorite }); await refresh(); })()}
                     onContextMenu={(event) => showContextMenu(event, document.id)}
                   />
                 ))}
@@ -473,8 +541,10 @@ export function WorkspacePage() {
               <DocumentList
                 documents={displayedDocuments}
                 selectedDocumentId={selectedDocumentId}
-                onSelect={setSelectedDocumentId}
+                selectedDocumentIds={selectedDocumentIds}
+                onSelect={(documentId, event) => selectDocument(documentId, event.shiftKey ? "range" : event.ctrlKey || event.metaKey ? "toggle" : "replace")}
                 onOpen={(documentId) => void openDocument(documentId)}
+                onToggleFavorite={(documentId) => void (async () => { const updated = await window.desktopApi.documents.toggleFavorite(documentId); updateEditorMetadata({ documentId: updated.id, name: updated.name, relativePath: updated.relativePath, isFavorite: updated.isFavorite }); await refresh(); })()}
                 onContextMenu={showContextMenu}
               />
             )}
@@ -536,14 +606,23 @@ export function WorkspacePage() {
         />
       )}
 
-      {dialog && (
+      {dialog?.type === "move" && (
+        <MoveDocumentDialog document={dialog.document} directories={directories} onClose={() => setDialog(null)} onMoved={async (updated) => { if (updated) updateEditorMetadata({ documentId: updated.id, name: updated.name, relativePath: updated.relativePath, isFavorite: updated.isFavorite }); await refresh(); }} />
+      )}
+      {batchMoveOpen && (
+        <MoveDocumentsDialog
+          documents={selectedDocuments}
+          directories={directories}
+          onClose={() => setBatchMoveOpen(false)}
+          onMoved={async () => { setSelectedDocumentId(null); await refresh(); }}
+        />
+      )}
+      {dialog && dialog.type !== "move" && (
         <Modal
           title={
             dialog.type === "rename"
               ? "重命名画布"
-              : dialog.type === "move"
-                ? "移动画布"
-                : dialog.type === "delete"
+              : dialog.type === "delete"
                   ? "永久删除"
                   : "新建文件夹"
           }

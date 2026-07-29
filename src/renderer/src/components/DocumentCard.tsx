@@ -1,11 +1,13 @@
-import { FileWarning, MoreHorizontal, Pin, Star } from "lucide-react";
+import { FileWarning, Pin, Star } from "lucide-react";
 import type { CanvasDocument } from "@shared/types";
+import { DocumentQuickActions } from "./DocumentQuickActions";
 
 interface DocumentCardProps {
   document: CanvasDocument;
   selected: boolean;
-  onSelect(): void;
+  onSelect(event: React.MouseEvent): void;
   onOpen(): void;
+  onToggleFavorite(): void;
   onContextMenu(event: React.MouseEvent): void;
 }
 
@@ -29,6 +31,7 @@ export function DocumentCard({
   selected,
   onSelect,
   onOpen,
+  onToggleFavorite,
   onContextMenu
 }: DocumentCardProps) {
   const thumbnailUrl = `canvasdesk://thumbnail/${document.id}?v=${document.modifiedAt}`;
@@ -73,13 +76,11 @@ export function DocumentCard({
             <Pin size={15} fill="currentColor" />
           </span>
         )}
+        <DocumentQuickActions isFavorite={document.isFavorite} onToggleFavorite={onToggleFavorite} onContextMenu={onContextMenu} />
       </div>
       <div className="document-card__body">
         <div>
           <h3>{document.name}</h3>
-          <button type="button" aria-label="更多操作" onClick={onContextMenu}>
-            <MoreHorizontal size={17} />
-          </button>
         </div>
         <p title={document.relativePath}>{document.relativePath}</p>
         <small>

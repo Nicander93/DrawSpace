@@ -24,6 +24,8 @@ interface WorkspaceState {
   pageNum: number;
   pageSize: number;
   selectedDocumentId: string | null;
+  selectedDocumentIds: string[];
+  anchorDocumentId: string | null;
   initialize(): Promise<void>;
   chooseWorkspace(providerType?: WorkspaceProviderType): Promise<boolean>;
   refresh(): Promise<void>;
@@ -34,6 +36,30 @@ interface WorkspaceState {
   setView(view: DocumentView): void;
   setPageNum(pageNum: number): void;
   setSelectedDocumentId(documentId: string | null): void;
+  selectDocument(documentId: string, mode?: "replace" | "toggle" | "range"): void;
+  selectAllDocuments(): void;
+}
+
+export function getNextSelectedDocumentIds(
+  documents: CanvasDocument[],
+  selectedDocumentIds: string[],
+  anchorDocumentId: string | null,
+  documentId: string,
+  mode: "replace" | "toggle" | "range"
+): string[] {
+  if (mode === "toggle") {
+    return selectedDocumentIds.includes(documentId)
+      ? selectedDocumentIds.filter((id) => id !== documentId)
+      : [...selectedDocumentIds, documentId];
+  }
+  if (mode === "range" && anchorDocumentId) {
+    const from = documents.findIndex((document) => document.id === anchorDocumentId);
+    const to = documents.findIndex((document) => document.id === documentId);
+    if (from >= 0 && to >= 0) {
+      return documents.slice(Math.min(from, to), Math.max(from, to) + 1).map((document) => document.id);
+    }
+  }
+  return [documentId];
 }
 
 const getErrorMessage = (error: unknown): string =>
@@ -55,6 +81,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   pageNum: 1,
   pageSize: 60,
   selectedDocumentId: null,
+  selectedDocumentIds: [],
+  anchorDocumentId: null,
 
   initialize: async () => {
     try {
@@ -81,6 +109,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         workspace,
         filter: "home",
         selectedDocumentId: null,
+        selectedDocumentIds: [],
+        anchorDocumentId: null,
         search: "",
         error: null
       });
@@ -134,7 +164,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   setFilter: (filter) => {
     const sort = filter === "recent" ? "lastOpened" : get().sort;
-    set({ filter, sort, pageNum: 1, selectedDocumentId: null });
+    set({ filter, sort, pageNum: 1, selectedDocumentId: null, selectedDocumentIds: [], anchorDocumentId: null });
     void get().refresh();
   },
   setSort: (sort) => {
@@ -146,8 +176,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   setView: (view) => set({ view }),
   setPageNum: (pageNum) => {
-    set({ pageNum, selectedDocumentId: null });
+    set({ pageNum, selectedDocumentId: null, selectedDocumentIds: [], anchorDocumentId: null });
     void get().refresh();
   },
-  setSelectedDocumentId: (selectedDocumentId) => set({ selectedDocumentId })
+  setSelectedDocumentId: (selectedDocumentId) => set({
+    selectedDocumentId,
+    selectedDocumentIds: selectedDocumentId ? [selectedDocumentId] : [],
+    anchorDocumentId: selectedDocumentId
+  }),
+  selectDocument: (documentId, mode = "replace") => {
+    const { documents, selectedDocumentIds, anchorDocumentId } = get();
+    const nextIds = getNextSelectedDocumentIds(documents, selectedDocumentIds, anchorDocumentId, documentId, mode);
+    set({ selectedDocumentId: nextIds.at(-1) ?? null, selectedDocumentIds: nextIds, anchorDocumentId: mode === "replace" ? documentId : anchorDocumentId ?? documentId });
+  },
+  selectAllDocuments: () => set((state) => ({
+    selectedDocumentId: state.documents.at(-1)?.id ?? null,
+    selectedDocumentIds: state.documents.map((document) => document.id),
+    anchorDocumentId: state.documents[0]?.id ?? null
+  }))
 }));
