@@ -38,8 +38,10 @@ export function DocumentList({
           key={document.id}
           role="button"
           tabIndex={0}
-          onClick={(event) => onSelect(document.id, event)}
-          onDoubleClick={() => onOpen(document.id)}
+          onClick={(event) => {
+            onSelect(document.id, event);
+            if (event.detail === 2) onOpen(document.id);
+          }}
           onContextMenu={(event) => onContextMenu(event, document.id)}
           onKeyDown={(event) => {
             if (event.key === "Enter") onOpen(document.id);

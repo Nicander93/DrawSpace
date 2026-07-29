@@ -36,13 +36,20 @@ export function DocumentCard({
 }: DocumentCardProps) {
   const thumbnailUrl = `canvasdesk://thumbnail/${document.id}?v=${document.modifiedAt}`;
 
+  const handleClick = (event: React.MouseEvent): void => {
+    onSelect(event);
+    // Electron can occasionally skip React's synthetic dblclick event on a
+    // card after the first click updates selection. MouseEvent.detail is
+    // delivered with the click itself and remains reliable in that case.
+    if (event.detail === 2) onOpen();
+  };
+
   return (
     <article
       className={`document-card ${selected ? "is-selected" : ""}`}
       tabIndex={0}
       role="button"
-      onClick={onSelect}
-      onDoubleClick={onOpen}
+      onClick={handleClick}
       onContextMenu={onContextMenu}
       onKeyDown={(event) => {
         if (event.key === "Enter") {

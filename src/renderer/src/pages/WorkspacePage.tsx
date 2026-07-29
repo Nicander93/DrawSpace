@@ -141,12 +141,23 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
 
   const openDocument = useCallback(
     (documentId: string) => {
+      const document = documents.find((item) => item.id === documentId);
+      if (!document) {
+        setToast("未找到要打开的画布");
+        return;
+      }
+      openEditorDocument({
+        documentId: document.id,
+        name: document.name,
+        relativePath: document.relativePath,
+        isFavorite: document.isFavorite
+      });
       // Navigate immediately. EditorWorkspacePage/EditorPage owns the async
       // open handshake and can show its loading or error state without
       // leaving the workspace click waiting on IPC.
       navigate(`/editor/${documentId}`);
     },
-    [navigate]
+    [documents, navigate, openEditorDocument]
   );
 
   const createDocument = useCallback(
