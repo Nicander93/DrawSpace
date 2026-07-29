@@ -167,7 +167,16 @@ export class LocalStorageProvider implements StorageProvider {
       } finally {
         await fileHandle.close();
       }
-      await rename(temporaryPath, absolutePath);
+      try {
+        await rename(temporaryPath, absolutePath);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "EPERM" && code !== "EEXIST") {
+          throw error;
+        }
+        await copyFile(temporaryPath, absolutePath);
+        await unlink(temporaryPath).catch(() => undefined);
+      }
     } catch (error) {
       await unlink(temporaryPath).catch(() => undefined);
       throw error;

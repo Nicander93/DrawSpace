@@ -198,7 +198,7 @@ export function EditorPage() {
         setDocument(result.document);
         dirtyRef.current = revisionRef.current !== revisionToSave;
         setSaveStatus(dirtyRef.current ? "dirty" : "saved");
-        await saveThumbnail();
+        void saveThumbnail();
         return true;
       })();
       savePromiseRef.current = saveOperation;

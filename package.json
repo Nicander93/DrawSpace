@@ -6,9 +6,12 @@
   "main": "out/main/index.js",
   "author": "CanvasDesk",
   "license": "MIT",
+  "config": {
+    "electron_mirror": "https://cdn.npmmirror.com/binaries/electron/"
+  },
   "scripts": {
     "dev": "electron-vite dev",
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "node node_modules/electron/install.js && electron-builder install-app-deps",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit",
@@ -16,6 +19,8 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
     "lint": "eslint .",
+    "rebuild:node": "npm rebuild better-sqlite3",
+    "rebuild:electron": "electron-builder install-app-deps",
     "package:win": "npm run build && electron-builder --win nsis",
     "package:dir": "npm run build && electron-builder --dir"
   },

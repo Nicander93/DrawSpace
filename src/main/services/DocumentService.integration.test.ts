@@ -13,7 +13,11 @@ import { WorkspaceService } from "./WorkspaceService";
 const require = createRequire(import.meta.url);
 const hasSqliteRuntime = (() => {
   try {
-    require.resolve("bindings");
+    const Database = require("better-sqlite3") as new (
+      filename: string
+    ) => { close: () => void };
+    const database = new Database(":memory:");
+    database.close();
     return true;
   } catch {
     return false;
@@ -21,10 +25,10 @@ const hasSqliteRuntime = (() => {
 })();
 
 describe.skipIf(!hasSqliteRuntime)("DocumentService 本地工作区", () => {
-  let testRootPath: string;
+  let testRootPath: string | undefined;
   let workspacePath: string;
-  let database: DatabaseService;
-  let workspaceService: WorkspaceService;
+  let database: DatabaseService | undefined;
+  let workspaceService: WorkspaceService | undefined;
   let recoveryService: RecoveryService;
   let documentService: DocumentService;
 
@@ -50,9 +54,11 @@ describe.skipIf(!hasSqliteRuntime)("DocumentService 本地工作区", () => {
   });
 
   afterEach(async () => {
-    await workspaceService.dispose();
-    database.close();
-    await rm(testRootPath, { recursive: true, force: true });
+    await workspaceService?.dispose();
+    database?.close();
+    if (testRootPath) {
+      await rm(testRootPath, { recursive: true, force: true });
+    }
   });
 
   it("创建、重命名、复制、删除和恢复画布", async () => {
@@ -80,7 +86,7 @@ describe.skipIf(!hasSqliteRuntime)("DocumentService 本地工作区", () => {
 
   it("外部修改后生成冲突副本而不覆盖原文件", async () => {
     const opened = await documentService.create();
-    const provider = workspaceService.getStorageProvider();
+    const provider = workspaceService!.getStorageProvider();
     const externalScene: ExcalidrawFile = {
       ...opened.sceneData,
       elements: [{ id: "external" }]
@@ -131,7 +137,7 @@ describe.skipIf(!hasSqliteRuntime)("DocumentService 本地工作区", () => {
     const opened = await documentService.create();
     const originalPath = opened.document.relativePath;
     await documentService.trash(opened.document.id);
-    await workspaceService
+    await workspaceService!
       .getStorageProvider()
       .write(originalPath, new TextEncoder().encode(JSON.stringify(opened.sceneData)));
 

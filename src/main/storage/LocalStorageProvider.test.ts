@@ -41,6 +41,19 @@ describe("LocalStorageProvider", () => {
     expect(entries.entries.map((entry) => entry.name)).toEqual(["首页.excalidraw"]);
   });
 
+  it("覆盖已有文件时仍能原子写入", async () => {
+    await provider.write("画布.excalidraw", new TextEncoder().encode("first"));
+    const result = await provider.write(
+      "画布.excalidraw",
+      new TextEncoder().encode("second")
+    );
+
+    expect(result.version).toBeTruthy();
+    expect(await readFile(resolve(workspacePath, "画布.excalidraw"), "utf8")).toBe(
+      "second"
+    );
+  });
+
   it("预期版本不一致时停止覆盖", async () => {
     await provider.write("画布.excalidraw", new TextEncoder().encode("first"));
     const currentStat = await provider.stat("画布.excalidraw");

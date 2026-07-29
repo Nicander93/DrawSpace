@@ -40,6 +40,11 @@ const formatFileTimestamp = (date = new Date()): string =>
 const buildVersion = (entry: StorageEntry, contentHash: string): string =>
   `${entry.modifiedAt ?? 0}:${entry.size ?? 0}:${contentHash}`;
 
+const versionContentHash = (version: string): string => {
+  const separatorIndex = version.lastIndexOf(":");
+  return separatorIndex >= 0 ? version.slice(separatorIndex + 1) : version;
+};
+
 export class DocumentService {
   constructor(
     private readonly database: DatabaseService,
@@ -114,26 +119,15 @@ export class DocumentService {
     const document = this.requireDocument(input.documentId);
     const provider = this.workspaceService.getStorageProvider();
     const currentData = await provider.read(document.relativePath);
-    const currentStat = await this.requireStat(document.relativePath);
     const currentHash = hashData(currentData);
-    const currentVersion = buildVersion(currentStat, currentHash);
 
-    if (currentVersion !== input.expectedVersion) {
+    if (currentHash !== versionContentHash(input.expectedVersion)) {
       this.logger?.warn("document.conflict", { documentId: document.id });
       return this.createConflictCopy(document, input.sceneData);
     }
 
     const fileData = serializeScene(input.sceneData);
-    try {
-      await provider.write(document.relativePath, fileData, {
-        expectedVersion: currentStat.version
-      });
-    } catch (error) {
-      if ((error as Error).message.includes("外部修改")) {
-        return this.createConflictCopy(document, input.sceneData);
-      }
-      throw error;
-    }
+    await provider.write(document.relativePath, fileData);
 
     const savedStat = await this.requireStat(document.relativePath);
     const contentHash = hashData(fileData);

@@ -3,7 +3,7 @@ import { basename, extname } from "node:path";
 import type { CanvasDocument, DocumentListResult, Workspace, WorkspaceProviderType } from "@shared/types";
 import { DatabaseService } from "../database/DatabaseService";
 import { LocalStorageProvider } from "../storage/LocalStorageProvider";
-import type { StorageProvider } from "../storage/StorageProvider";
+import type { StorageProvider, StorageWatchEvent } from "../storage/StorageProvider";
 import type { AppLogger } from "./AppLogger";
 
 interface WorkspaceMetadata {
@@ -227,17 +227,77 @@ export class WorkspaceService {
     if (!provider.watch) {
       return;
     }
+    const pendingPaths = new Map<string, StorageWatchEvent["type"]>();
     this.stopWatcher = await provider.watch("", (event) => {
       if (!event.path.toLowerCase().endsWith(".excalidraw")) {
         return;
       }
+      if (basename(event.path).startsWith(".")) {
+        return;
+      }
+      pendingPaths.set(event.path, event.type);
       if (this.scanTimer) {
         clearTimeout(this.scanTimer);
       }
       this.scanTimer = setTimeout(() => {
-        void this.scan().catch(() => undefined);
-      }, 500);
+        const batch = [...pendingPaths.entries()];
+        pendingPaths.clear();
+        void this.applyWatchBatch(batch).catch((error) => {
+          this.logger?.error("workspace.watch.failed", error);
+        });
+      }, 400);
     });
+  }
+
+  private async applyWatchBatch(
+    batch: Array<[string, StorageWatchEvent["type"]]>
+  ): Promise<void> {
+    const workspace = this.activeWorkspace;
+    if (!workspace?.isAvailable) {
+      return;
+    }
+    const provider = this.getStorageProvider();
+    let changed = false;
+
+    for (const [relativePath, eventType] of batch) {
+      if (eventType === "deleted") {
+        const existing = this.database.getDocumentByPath(
+          workspace.id,
+          relativePath
+        );
+        if (existing && !existing.isDeleted) {
+          this.database.deleteDocument(existing.id);
+          changed = true;
+        }
+        continue;
+      }
+
+      try {
+        const entry = await provider.stat(relativePath);
+        if (!entry || entry.type !== "file") {
+          continue;
+        }
+        const fileData = await provider.read(relativePath);
+        this.database.upsertScannedDocument({
+          workspaceId: workspace.id,
+          name: basename(relativePath, ".excalidraw"),
+          relativePath,
+          fileSize: entry.size ?? fileData.byteLength,
+          createdAt: entry.createdAt ?? entry.modifiedAt ?? Date.now(),
+          modifiedAt: entry.modifiedAt ?? Date.now(),
+          contentHash: hashData(fileData)
+        });
+        changed = true;
+      } catch (error) {
+        this.logger?.warn("workspace.watch.file-skipped", {
+          reason: error instanceof Error ? error.message : "unknown read error"
+        });
+      }
+    }
+
+    if (changed) {
+      this.indexChangedListeners.forEach((listener) => listener());
+    }
   }
 
   private async stopActiveWatcher(): Promise<void> {
