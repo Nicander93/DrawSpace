@@ -140,24 +140,13 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
   );
 
   const openDocument = useCallback(
-    async (documentId: string) => {
-      try {
-        const initialContent = await window.desktopApi.documents.open(documentId);
-        navigate(`/editor/${documentId}`, { state: { initialContent } });
-      } catch (openError) {
-        const failedDocument = documents.find(
-          (document) => document.id === documentId
-        );
-        const message =
-          openError instanceof Error ? openError.message : "无法打开画布";
-        if (failedDocument) {
-          setOpenFailure({ document: failedDocument, message });
-        } else {
-          setToast(message);
-        }
-      }
+    (documentId: string) => {
+      // Navigate immediately. EditorWorkspacePage/EditorPage owns the async
+      // open handshake and can show its loading or error state without
+      // leaving the workspace click waiting on IPC.
+      navigate(`/editor/${documentId}`);
     },
-    [documents, navigate]
+    [navigate]
   );
 
   const createDocument = useCallback(
