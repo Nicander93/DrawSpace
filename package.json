@@ -1,8 +1,8 @@
 {
-  "name": "my-excaildraw-local",
+  "name": "drawspace",
   "version": "0.1.0",
   "private": true,
-  "description": "本地 Excalidraw 桌面画布工具",
+  "description": "基于 Electron 和 Excalidraw 的本地桌面画布管理工具",
   "main": "out/main/index.js",
   "license": "MIT",
   "config": {
@@ -18,7 +18,7 @@
     "test:watch": "vitest",
     "test:e2e": "npm run build && playwright test",
     "lint": "eslint .",
-    "package:win": "npm run build && electron-builder --win nsis",
+    "package:win": "npm run build && electron-builder --win nsis --x64",
     "package:dir": "npm run build && electron-builder --dir"
   },
   "dependencies": {
@@ -51,8 +51,8 @@
     "vitest": "^2.1.8"
   },
   "build": {
-    "appId": "local.my-excaildraw",
-    "productName": "my-excaildraw-local",
+    "appId": "io.github.nicander93.drawspace",
+    "productName": "DrawSpace",
     "asar": true,
     "npmRebuild": false,
     "asarUnpack": [
@@ -83,10 +83,20 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "my-excaildraw-local"
+      "shortcutName": "DrawSpace"
     },
     "electronDownload": {
       "mirror": "https://cdn.npmmirror.com/binaries/electron/"
-    }
+    },
+    "artifactName": "${productName}-${version}-${arch}.${ext}"
+  },
+  "author": "Nicander93",
+  "homepage": "https://github.com/Nicander93/DrawSpace",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nicander93/DrawSpace.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Nicander93/DrawSpace/issues"
   }
 }

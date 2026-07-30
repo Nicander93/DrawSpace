@@ -76,7 +76,7 @@ const createTray = (): void => {
     icon.setTemplateImage(true);
   }
   tray = new Tray(icon);
-  tray.setToolTip("my-excaildraw-local");
+  tray.setToolTip("DrawSpace");
   tray.setContextMenu(Menu.buildFromTemplate([
     {
       label: "显示主窗口",
@@ -271,8 +271,8 @@ if (!hasSingleInstanceLock) {
   void app
     .whenReady()
     .then(async () => {
-      app.setName("my-excaildraw-local");
-      app.setAppUserModelId("local.my-excaildraw");
+      app.setName("DrawSpace");
+      app.setAppUserModelId("io.github.nicander93.drawspace");
       await initializeApplication();
 
       app.on("activate", () => {
