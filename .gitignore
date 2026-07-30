@@ -17,3 +17,22 @@ coverage/
 # Local planning notes and screenshots.
 docs/
 v0-prd.md
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+credentials.*
+secrets.*
+application-local.yml
+application-local.yaml
+application-*.local.yml
+application-*.local.yaml
