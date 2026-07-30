@@ -213,6 +213,7 @@ export function EditorWorkspacePage({ visible = true }: { visible?: boolean }) {
         const requestId = closeRequestIdRef.current;
         if (requestId) window.desktopApi.lifecycle.respondToClose({ requestId, decision: "proceed" });
       })
+      .finally(() => setCloseBusy(false))
       .catch((error) => setCloseError(error instanceof Error ? error.message : "无法清理恢复快照"));
   }, [closeBusy, closeIntent, navigate, pendingTabCloseIds, tabs]);
 
@@ -229,10 +230,11 @@ export function EditorWorkspacePage({ visible = true }: { visible?: boolean }) {
           if (closeIntent === "tabs") {
             return Promise.all(targetTabs.map((tab) => closeHandlersRef.current.get(tab.documentId)?.() ?? Promise.resolve()))
               .then(() => targetTabs.forEach((tab) => useEditorStore.getState().closeDocument(tab.documentId)))
-              .then(() => { setPendingTabCloseIds(null); setCloseDialogOpen(false); });
+              .then(() => { setPendingTabCloseIds(null); setCloseDialogOpen(false); setCloseBusy(false); });
           }
           if (closeIntent === "workspace") {
             setCloseDialogOpen(false);
+            setCloseBusy(false);
             navigate("/");
             return;
           }

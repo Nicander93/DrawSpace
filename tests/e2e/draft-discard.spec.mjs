@@ -30,6 +30,12 @@ test("discarding a new draft removes it from all canvases", async () => {
       const result = await window.desktopApi.documents.list({ filter: "all" });
       return result.total;
     })).toBe(0);
+
+    await page.locator(".quick-action--new").click();
+    await expect(page.locator(".editor-canvas")).toBeVisible();
+    await page.locator(".editor-workspace__back").click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator("footer button").first()).toBeEnabled();
   } finally {
     await application?.evaluate(({ app }) => app.exit(0)).catch(() => undefined);
     await rm(workspacePath, { recursive: true, force: true });
