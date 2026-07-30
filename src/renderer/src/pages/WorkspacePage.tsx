@@ -2,6 +2,8 @@ import {
   AlertCircle,
   ChevronDown,
   FilePlus2,
+  Folder,
+  FolderPlus,
   RefreshCw,
   Trash2,
   Upload
@@ -38,7 +40,7 @@ interface ContextMenuState {
 }
 
 const pageTitles = {
-  home: "工作区",
+  home: "首页",
   all: "全部画布",
   recent: "最近打开",
   favorites: "收藏夹",
@@ -90,6 +92,8 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
   const [restoreConflictDocument, setRestoreConflictDocument] =
     useState<CanvasDocument | null>(null);
   const [batchMoveOpen, setBatchMoveOpen] = useState(false);
+  const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -167,7 +171,7 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
           relativeDirectory
         );
         navigate(`/editor/${initialContent.document.id}`, {
-          state: { initialContent }
+          state: { initialContent, isDraft: true }
         });
       } catch (createError) {
         setToast(
@@ -243,6 +247,17 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
     visible
   ]);
 
+    const moveDocumentToFolder = useCallback(async (documentId: string, directory: string) => {
+    try {
+      const updated = await window.desktopApi.documents.move(documentId, directory);
+      updateEditorMetadata({ documentId: updated.id, name: updated.name, relativePath: updated.relativePath, isFavorite: updated.isFavorite });
+      setToast("画布已移动");
+      await refresh();
+    } catch (moveError) {
+      setToast(moveError instanceof Error ? moveError.message : "移动失败");
+    }
+  }, [refresh, updateEditorMetadata]);
+
   if (!workspace) {
     return null;
   }
@@ -253,7 +268,7 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
   ): void => {
     event.preventDefault();
     event.stopPropagation();
-    setSelectedDocumentId(documentId);
+    if (!selectedDocumentIds.includes(documentId)) setSelectedDocumentId(documentId);
     setContextMenu({ documentId, x: event.clientX, y: event.clientY });
   };
 
@@ -273,9 +288,29 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
       | "trash"
       | "restore"
       | "delete"
+      | "batchOpen"
+      | "batchFavorite"
+      | "batchMove"
+      | "batchTrash"
   ): Promise<void> => {
     if (!contextDocument) return;
     setContextMenu(null);
+    if (action === "batchOpen") {
+      openSelectedDocuments();
+      return;
+    }
+    if (action === "batchFavorite") {
+      await toggleSelectedFavorites();
+      return;
+    }
+    if (action === "batchMove") {
+      setBatchMoveOpen(true);
+      return;
+    }
+    if (action === "batchTrash") {
+      await trashSelectedDocuments();
+      return;
+    }
     if (action === "open") {
       await openDocument(contextDocument.id);
       return;
@@ -333,7 +368,8 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
         await window.desktopApi.documents.deletePermanently(dialog.document.id);
         setToast("画布已永久删除");
       } else if (dialog.type === "createFolder") {
-        await window.desktopApi.workspace.createDirectory(dialogValue);
+        const directory = currentFolder ? `${currentFolder}/${dialogValue.trim()}` : dialogValue.trim();
+        await window.desktopApi.workspace.createDirectory(directory);
         setToast("文件夹已创建");
       }
       setDialog(null);
@@ -369,9 +405,20 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
     }
   };
 
-  const displayedDocuments =
-    filter === "home" && !searchDraft ? documents.slice(0, 5) : documents;
+  const documentDirectory = (relativePath: string): string => {
+    const separator = relativePath.lastIndexOf("/");
+    return separator < 0 ? "" : relativePath.slice(0, separator);
+  };
+  const folderEntries = filter === "all" && !searchDraft
+    ? directories.filter((directory) => documentDirectory(directory) === (currentFolder ?? ""))
+    : [];
+  const displayedDocuments = filter === "home" && !searchDraft
+    ? documents.slice(0, 5)
+    : currentFolder && filter === "all" && !searchDraft
+      ? documents.filter((document) => documentDirectory(document.relativePath) === currentFolder)
+      : documents;
   const isHome = filter === "home" && !searchDraft;
+  const isFolderView = filter === "all" && !searchDraft;
   const selectedDocuments = documents.filter((document) => selectedDocumentIds.includes(document.id));
 
   const toggleSelectedFavorites = async (): Promise<void> => {
@@ -395,6 +442,51 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
     if (lastDocument) navigate(`/editor/${lastDocument.id}`);
   };
 
+  const renderFolderCard = (directory: string) => (
+    <article
+      className={`document-card folder-card ${selectedFolder === directory ? "is-selected" : ""}`}
+      key={directory}
+      role="button"
+      tabIndex={0}
+      onClick={() => {
+        setSelectedFolder(directory);
+        setSelectedDocumentId(null);
+      }}
+      onDoubleClick={() => {
+        setCurrentFolder(directory);
+        setSelectedFolder(null);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          setCurrentFolder(directory);
+          setSelectedFolder(null);
+        }
+      }}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        const documentId = event.dataTransfer.getData("application/x-canvas-document");
+        if (documentId) void moveDocumentToFolder(documentId, directory);
+      }}
+    >
+      <div className="document-card__preview folder-card__preview">
+        <input
+          className="document-card__checkbox"
+          type="checkbox"
+          checked={selectedFolder === directory}
+          aria-label={`选择文件夹 ${directory}`}
+          onClick={(event) => event.stopPropagation()}
+          onChange={() => setSelectedFolder((selected) => selected === directory ? null : directory)}
+        />
+        <Folder size={52} fill="currentColor" strokeWidth={1.4} />
+      </div>
+      <div className="document-card__body">
+        <div><h3>{directory.split("/").at(-1)}</h3></div>
+        <p title={directory}>{directory}</p>
+        <small>文件夹</small>
+      </div>
+    </article>
+  );
   return (
     <div
       className="workspace-page"
@@ -410,13 +502,13 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
       onClick={() => setContextMenu(null)}
     >
       <WorkspaceSidebar
-        workspace={workspace}
         activeFilter={filter}
-        directories={directories}
-        onFilterChange={setFilter}
-        onCreateInFolder={(relativeDirectory) =>
-          void createDocument(relativeDirectory)
-        }
+        onFilterChange={(nextFilter) => {
+          setCurrentFolder(null);
+          setSearchDraft("");
+          setSearch("");
+          setFilter(nextFilter);
+        }}
       />
       <div className="workspace-shell">
         <WorkspaceTopbar
@@ -429,50 +521,70 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
           <div className="workspace-content">
             {isHome ? (
               <>
-                <div className="workspace-greeting">
-                  <h1>下午好，小画家 <span>👋</span></h1>
-                  <p>准备好把想法画出来了吗？</p>
-                </div>
                 <QuickActions
-                  onCreate={() => void createDocument()}
+                  onCreate={() => void createDocument(currentFolder ?? undefined)}
                   onImport={() => void importDocuments()}
-                  onCreateFolder={() => {
-                    setDialogValue("");
-                    setDialog({ type: "createFolder" });
-                  }}
                 />
               </>
             ) : (
               <div className="page-heading">
                 <div>
-                  <h1>{searchDraft ? `搜索“${searchDraft}”` : pageTitles[filter]}</h1>
-                  <p>{loading ? "正在读取本地索引…" : `共 ${total} 个画布`}</p>
+                  {currentFolder && (
+                    <div className="folder-breadcrumb">
+                      <button type="button" onClick={() => setCurrentFolder(null)}>全部画布</button>
+                      <span>/</span>
+                      <span>{currentFolder}</span>
+                    </div>
+                  )}
+                  <h1>{searchDraft ? `搜索“${searchDraft}”` : currentFolder ? currentFolder.split("/").at(-1) : pageTitles[filter]}</h1>
+                  <p>{loading ? "正在读取本地索引…" : `共 ${isFolderView ? displayedDocuments.length : total} 个画布`}</p>
                 </div>
-                {filter === "trash" ? (
-                  total > 0 && (
-                    <button
-                      className="button button--danger-outline"
-                      type="button"
-                      onClick={() => {
-                        void window.desktopApi.documents.emptyTrash().then(refresh);
-                      }}
+                <div className="page-heading__actions">
+                  {filter === "trash" ? (
+                    total > 0 && (
+                      <button
+                        className="button button--danger-outline"
+                        type="button"
+                        onClick={() => {
+                          void window.desktopApi.documents.emptyTrash().then(refresh);
+                        }}
+                      >
+                        <Trash2 size={16} />
+                        清空回收站
+                      </button>
+                    )
+                  ) : (
+                    <>
+                      <button className="button" type="button" onClick={() => void importDocuments()}>
+                        <Upload size={16} />
+                        导入
+                      </button>
+                      {isFolderView && (
+                        <button className="button" type="button" onClick={() => { setDialogValue(""); setDialog({ type: "createFolder" }); }}>
+                          <FolderPlus size={16} />
+                          新建文件夹
+                        </button>
+                      )}
+                      <button className="button button--primary" type="button" onClick={() => void createDocument(currentFolder ?? undefined)}>
+                        <FilePlus2 size={16} />
+                        新建画布
+                      </button>
+                    </>
+                  )}
+                  <label className="sort-select">
+                    <span>排序</span>
+                    <select
+                      value={sort}
+                      onChange={(event) => setSort(event.target.value as DocumentSort)}
                     >
-                      <Trash2 size={16} />
-                      清空回收站
-                    </button>
-                  )
-                ) : (
-                  <div className="page-heading__actions">
-                    <button className="button" type="button" onClick={() => void importDocuments()}>
-                      <Upload size={16} />
-                      导入
-                    </button>
-                    <button className="button button--primary" type="button" onClick={() => void createDocument()}>
-                      <FilePlus2 size={16} />
-                      新建画布
-                    </button>
-                  </div>
-                )}
+                      <option value="lastOpened">最近打开</option>
+                      <option value="modified">最近修改</option>
+                      <option value="nameAsc">名称升序</option>
+                      <option value="nameDesc">名称降序</option>
+                      <option value="created">创建时间</option>
+                    </select>
+                  </label>
+                </div>
               </div>
             )}
 
@@ -486,17 +598,6 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
                   查看全部
                   <ChevronDown size={15} />
                 </button>
-              </div>
-            )}
-
-            {selectedDocuments.length > 0 && filter !== "trash" && (
-              <div className="selection-toolbar">
-                <strong>已选择 {selectedDocuments.length} 个画布</strong>
-                <button className="button" type="button" onClick={() => void toggleSelectedFavorites()}>批量收藏</button>
-                <button className="button" type="button" onClick={() => setBatchMoveOpen(true)}>批量移动</button>
-                <button className="button" type="button" onClick={openSelectedDocuments}>批量打开</button>
-                <button className="button button--danger-outline" type="button" onClick={() => void trashSelectedDocuments()}>批量移入回收站</button>
-                <button className="button" type="button" onClick={() => setSelectedDocumentId(null)}>取消选择</button>
               </div>
             )}
 
@@ -517,36 +618,48 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
                   <span key={index} />
                 ))}
               </div>
-            ) : displayedDocuments.length === 0 ? (
+            ) : displayedDocuments.length === 0 && folderEntries.length === 0 ? (
               <EmptyState
                 isTrash={filter === "trash"}
-                onCreate={() => void createDocument()}
+                onCreate={() => void createDocument(currentFolder ?? undefined)}
                 onImport={() => void importDocuments()}
               />
-            ) : view === "grid" ? (
+            ) : (
+              <>
+                {view !== "grid" && isFolderView && folderEntries.length > 0 && (
+                  <div className="folder-grid" aria-label="文件夹">
+                    {folderEntries.map(renderFolderCard)}
+                  </div>
+                )}
+                {view === "grid" ? (
               <div className="document-grid">
+                {isFolderView && folderEntries.map(renderFolderCard)}
                 {displayedDocuments.map((document) => (
                   <DocumentCard
                     key={document.id}
                     document={document}
-                    selected={selectedDocumentId === document.id}
-                    onSelect={(event) => selectDocument(document.id, event.shiftKey ? "range" : event.ctrlKey || event.metaKey ? "toggle" : "replace")}
+                    selected={selectedDocumentIds.includes(document.id)}
+                    onSelect={(event) => { setSelectedFolder(null); selectDocument(document.id, event.shiftKey ? "range" : event.ctrlKey || event.metaKey ? "toggle" : "replace"); }}
+                    onToggleSelection={() => selectDocument(document.id, "toggle")}
                     onOpen={() => void openDocument(document.id)}
                     onToggleFavorite={() => void (async () => { const updated = await window.desktopApi.documents.toggleFavorite(document.id); updateEditorMetadata({ documentId: updated.id, name: updated.name, relativePath: updated.relativePath, isFavorite: updated.isFavorite }); await refresh(); })()}
                     onContextMenu={(event) => showContextMenu(event, document.id)}
+                    onDragStart={(event, documentId) => event.dataTransfer.setData("application/x-canvas-document", documentId)}
                   />
                 ))}
               </div>
-            ) : (
-              <DocumentList
-                documents={displayedDocuments}
-                selectedDocumentId={selectedDocumentId}
-                selectedDocumentIds={selectedDocumentIds}
-                onSelect={(documentId, event) => selectDocument(documentId, event.shiftKey ? "range" : event.ctrlKey || event.metaKey ? "toggle" : "replace")}
-                onOpen={(documentId) => void openDocument(documentId)}
-                onToggleFavorite={(documentId) => void (async () => { const updated = await window.desktopApi.documents.toggleFavorite(documentId); updateEditorMetadata({ documentId: updated.id, name: updated.name, relativePath: updated.relativePath, isFavorite: updated.isFavorite }); await refresh(); })()}
-                onContextMenu={showContextMenu}
-              />
+                ) : (
+                  <DocumentList
+                    documents={displayedDocuments}
+                    selectedDocumentId={selectedDocumentId}
+                    selectedDocumentIds={selectedDocumentIds}
+                    onSelect={(documentId, event) => { setSelectedFolder(null); selectDocument(documentId, event.shiftKey ? "range" : event.ctrlKey || event.metaKey ? "toggle" : "replace"); }}
+                    onOpen={(documentId) => void openDocument(documentId)}
+                    onToggleFavorite={(documentId) => void (async () => { const updated = await window.desktopApi.documents.toggleFavorite(documentId); updateEditorMetadata({ documentId: updated.id, name: updated.name, relativePath: updated.relativePath, isFavorite: updated.isFavorite }); await refresh(); })()}
+                    onContextMenu={showContextMenu}
+                  />
+                )}
+              </>
             )}
             {!isHome && total > pageSize && (
               <div className="pagination">
@@ -581,19 +694,7 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
             />
           )}
 
-          <label className="sort-select">
-            <span>排序</span>
-            <select
-              value={sort}
-              onChange={(event) => setSort(event.target.value as DocumentSort)}
-            >
-              <option value="lastOpened">最近打开</option>
-              <option value="modified">最近修改</option>
-              <option value="nameAsc">名称升序</option>
-              <option value="nameDesc">名称降序</option>
-              <option value="created">创建时间</option>
-            </select>
-          </label>
+
         </main>
       </div>
 
@@ -601,6 +702,7 @@ export function WorkspacePage({ visible = true }: { visible?: boolean }) {
         <DocumentContextMenu
           document={contextDocument}
           position={contextMenu}
+          selectedCount={selectedDocumentIds.length}
           onAction={(action) => void handleContextAction(action)}
           onClose={() => setContextMenu(null)}
         />

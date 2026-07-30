@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExcalidrawFile } from "@shared/types";
-import { DocumentSaveCoordinator } from "./DocumentSaveCoordinator";
+import { DocumentSaveCoordinator } from "@renderer/features/editor/DocumentSaveCoordinator";
+
 
 const scene: ExcalidrawFile = {
   type: "excalidraw",
@@ -38,24 +39,11 @@ describe("DocumentSaveCoordinator", () => {
     expect(saves).toEqual([1, 2]);
   });
 
-  it("持续编辑时保留最长等待计时器", async () => {
-    vi.useFakeTimers();
-    const save = vi.fn(async () => ({ status: "saved" as const }));
-    const coordinator = new DocumentSaveCoordinator({
-      documentId: "doc",
-      getScene: () => scene,
-      getExpectedVersion: () => "1:1",
-      executeSave: save,
-      onStatusChange: () => undefined
-    });
-    coordinator.markChanged();
-    await vi.advanceTimersByTimeAsync(29_000);
-    coordinator.markChanged();
-    await vi.advanceTimersByTimeAsync(1_000);
-    expect(save).toHaveBeenCalledTimes(1);
-  });
 
-  it("uses a five second debounce and resets it after another edit", async () => {
+
+
+
+  it("waits for an explicit save request", async () => {
     vi.useFakeTimers();
     const save = vi.fn(async () => ({ status: "saved" as const }));
     const coordinator = new DocumentSaveCoordinator({
@@ -67,15 +55,11 @@ describe("DocumentSaveCoordinator", () => {
     });
 
     coordinator.markChanged();
-    await vi.advanceTimersByTimeAsync(4_999);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(save).not.toHaveBeenCalled();
-    coordinator.markChanged();
-    await vi.advanceTimersByTimeAsync(1);
-    expect(save).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(4_999);
+    await coordinator.requestSave("manual");
     expect(save).toHaveBeenCalledTimes(1);
   });
-
   it("keeps dirty state and reports an error without retrying forever", async () => {
     vi.useFakeTimers();
     const statuses: string[] = [];
@@ -112,8 +96,7 @@ describe("DocumentSaveCoordinator", () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  it("forces a save at the thirty second maximum while edits continue", async () => {
-    vi.useFakeTimers();
+  it("can be activated again after a development StrictMode cleanup", async () => {
     const save = vi.fn(async () => ({ status: "saved" as const }));
     const coordinator = new DocumentSaveCoordinator({
       documentId: "doc",
@@ -122,14 +105,17 @@ describe("DocumentSaveCoordinator", () => {
       executeSave: save,
       onStatusChange: () => undefined
     });
+
+    coordinator.dispose();
+    coordinator.activate();
     coordinator.markChanged();
-    for (let index = 0; index < 7; index += 1) {
-      await vi.advanceTimersByTimeAsync(4_000);
-      coordinator.markChanged();
-    }
-    await vi.advanceTimersByTimeAsync(2_000);
-    expect(save).toHaveBeenCalled();
+    const outcome = await coordinator.requestSave("manual");
+
+    expect(outcome.status).toBe("saved");
+    expect(save).toHaveBeenCalledTimes(1);
   });
+
+
 
   it("isolates save failures between two document coordinators", async () => {
     const saveA = vi.fn(async () => ({ status: "failed" as const, message: "A failed" }));

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { buildDirectoryTree } from "./MoveDocumentDialog";
+import { buildDirectoryTree } from "@renderer/components/MoveDocumentDialog";
+
 
 describe("buildDirectoryTree", () => {
   test("builds nested folders once and preserves the root choice separately", () => {

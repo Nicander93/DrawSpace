@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from "vitest";
 import type { CanvasDocument } from "@shared/types";
-import { useEditorStore } from "./editorStore";
+import { useEditorStore } from "@renderer/stores/editorStore";
+
 
 const documents: CanvasDocument[] = [
   { id: "a", workspaceId: "w", name: "A", relativePath: "A.excalidraw", extension: ".excalidraw", fileSize: 0, isFavorite: false, isDeleted: false, createdAt: 1, modifiedAt: 1, lastOpenedAt: 1, contentHash: null, thumbnailPath: null, syncStatus: "local" },

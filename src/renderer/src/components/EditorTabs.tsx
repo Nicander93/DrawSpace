@@ -8,6 +8,7 @@ interface EditorTabsProps {
   onClose(documentId: string): void;
   onAdd(): void;
   onReorder(fromIndex: number, toIndex: number): void;
+  onRename(tab: EditorTab): void;
   onContextMenu(tab: EditorTab, event: React.MouseEvent): void;
 }
 
@@ -18,7 +19,7 @@ const StatusIcon = ({ tab }: { tab: EditorTab }) => {
   return <Check size={13} />;
 };
 
-export function EditorTabs({ tabs, activeDocumentId, onActivate, onClose, onAdd, onReorder, onContextMenu }: EditorTabsProps) {
+export function EditorTabs({ tabs, activeDocumentId, onActivate, onClose, onAdd, onReorder, onRename, onContextMenu }: EditorTabsProps) {
   return (
     <div className="editor-tabs" role="tablist" aria-label="已打开画布">
       {tabs.map((tab, index) => (
@@ -31,10 +32,9 @@ export function EditorTabs({ tabs, activeDocumentId, onActivate, onClose, onAdd,
           title={`${tab.name}\n${tab.relativePath}`}
           draggable
           onClick={() => onActivate(tab.documentId)}
-          onDoubleClick={(event) => {
-            event.preventDefault();
+          onDoubleClick={() => {
             onActivate(tab.documentId);
-            window.dispatchEvent(new CustomEvent("canvasdesk:request-rename", { detail: tab.documentId }));
+            onRename(tab);
           }}
           onContextMenu={(event) => { event.preventDefault(); onContextMenu(tab, event); }}
           onMouseDown={(event) => {

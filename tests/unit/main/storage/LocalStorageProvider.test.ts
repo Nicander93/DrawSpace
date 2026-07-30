@@ -2,8 +2,10 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { LocalStorageProvider } from "./LocalStorageProvider";
-import { StorageError } from "./StorageError";
+import { LocalStorageProvider } from "@main/storage/LocalStorageProvider";
+import { StorageError } from "@main/storage/StorageError";
+
+
 
 describe("LocalStorageProvider", () => {
   let workspacePath: string;

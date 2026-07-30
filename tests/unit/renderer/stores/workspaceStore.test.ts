@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasDocument } from "@shared/types";
-import { getNextSelectedDocumentIds } from "./workspaceStore";
+import { getNextSelectedDocumentIds } from "@renderer/stores/workspaceStore";
+
 
 const documentOf = (id: string): CanvasDocument => ({
   id, workspaceId: "workspace", name: id, relativePath: `${id}.excalidraw`, extension: ".excalidraw",

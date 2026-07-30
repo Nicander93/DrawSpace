@@ -1,11 +1,4 @@
-import {
-  Bell,
-  CircleHelp,
-  Grid2X2,
-  List,
-  Search,
-  X
-} from "lucide-react";
+import { Grid2X2, List, Search, X } from "lucide-react";
 import type { DocumentView } from "@shared/types";
 import { WindowControls } from "./WindowControls";
 
@@ -16,6 +9,7 @@ interface WorkspaceTopbarProps {
   onViewChange(view: DocumentView): void;
 }
 
+/** 工作区搜索、视图切换与窗口控制。 */
 export function WorkspaceTopbar({
   search,
   view,
@@ -61,12 +55,6 @@ export function WorkspaceTopbar({
           <List size={17} />
         </button>
       </div>
-      <button className="topbar-icon" type="button" aria-label="帮助">
-        <CircleHelp size={18} />
-      </button>
-      <button className="topbar-icon" type="button" aria-label="通知">
-        <Bell size={17} />
-      </button>
       <WindowControls />
     </header>
   );

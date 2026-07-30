@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import type { RecoveryItem } from "@shared/types";
+import { Brand } from "./components/Brand";
 import { RecoveryDialog } from "./components/RecoveryDialog";
 import { AppCloseProvider } from "./features/lifecycle/AppCloseContext";
 import { EditorWorkspacePage } from "./pages/EditorWorkspacePage";
@@ -17,13 +18,13 @@ function AppShell() {
     <div className="app-shell-surfaces">
       <section
         className={`app-shell-surface ${!isEditor ? "is-visible" : ""}`}
-        aria-hidden={isEditor}
+        inert={isEditor ? true : undefined}
       >
         <WorkspacePage visible={!isEditor} />
       </section>
       <section
         className={`app-shell-surface ${isEditor ? "is-visible" : ""}`}
-        aria-hidden={!isEditor}
+        inert={!isEditor ? true : undefined}
       >
         <EditorWorkspacePage visible={isEditor} />
       </section>
@@ -57,10 +58,8 @@ export default function App() {
   if (!initialized) {
     return (
       <div className="app-loading">
-        <div className="brand-mark brand-mark--loading">
-          <span />
-        </div>
-        <p>正在整理你的画布…</p>
+        <Brand compact />
+        <p>正在读取本地画布…</p>
       </div>
     );
   }

@@ -1,4 +1,4 @@
-import { Cloud, CloudCog, HardDrive, RefreshCw } from "lucide-react";
+import { HardDrive, RefreshCw } from "lucide-react";
 import type { Workspace } from "@shared/types";
 
 interface StoragePanelProps {
@@ -7,6 +7,7 @@ interface StoragePanelProps {
   onRescan(): void;
 }
 
+/** 显示当前工作区的实际本地存储位置。 */
 export function StoragePanel({
   workspace,
   scanning,
@@ -28,26 +29,6 @@ export function StoragePanel({
           <strong>{workspace.providerType === "nutstore" ? "坚果云目录" : "本地工作区"}</strong>
           <p title={workspace.rootPath}>{workspace.name}</p>
           <small><i /> 已连接</small>
-        </div>
-      </div>
-      <div className="storage-card storage-card--planned">
-        <span className="storage-card__icon storage-card__icon--cloud">
-          <Cloud size={23} />
-        </span>
-        <div>
-          <strong>OSS / MinIO</strong>
-          <p>兼容对象存储</p>
-          <small>V1 即将支持</small>
-        </div>
-      </div>
-      <div className="storage-card storage-card--planned">
-        <span className="storage-card__icon storage-card__icon--webdav">
-          <CloudCog size={23} />
-        </span>
-        <div>
-          <strong>WebDAV</strong>
-          <p>自托管同步</p>
-          <small>后续版本</small>
         </div>
       </div>
     </aside>

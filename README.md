@@ -1,86 +1,45 @@
-# 画伴 CanvasDesk
+# my-excaildraw-local
 
-画伴是一个基于 Excalidraw 的本地优先桌面画布工作区。它在保留 Excalidraw 原生绘图体验的基础上，提供工作区管理、缩略图、搜索、收藏、回收站、可靠保存和异常恢复能力。
+基于 Electron 和 Excalidraw 的本地桌面画布工具。项目以用户选择的本地目录为工作区，提供画布管理、编辑、搜索、回收站和可靠保存能力。
 
-![画伴 UI 设计](./ChatGPT%20Image%20Jul%2028%2C%202026%2C%2010_46_28%20AM.png)
+## 功能
 
-## V0 功能
-
-- 选择任意本地文件夹或坚果云本地同步目录作为工作区
-- 递归扫描并索引标准 `.excalidraw` 文件
-- 新建、打开、重命名、移动、复制、收藏和搜索画布
-- 卡片视图、列表视图、最近打开、排序和分页
-- 拖拽导入、文件选择导入和同名文件自动避让
+- 选择本地文件夹作为工作区，递归索引 `.excalidraw` 文件
+- 新建、打开、重命名、移动、复制、收藏、搜索和删除画布
+- 卡片/列表视图、最近打开、排序、分页和多标签编辑
+- 自动保存、串行保存、外部修改检测、冲突副本和异常恢复
 - 回收站、恢复、永久删除和清空回收站
-- 嵌入官方 Excalidraw 编辑器，支持图片和 BinaryFiles
-- 多画布标签、标签切换/排序/关闭和跨文档工作区
-- 停止编辑 5 秒自动保存、持续编辑 30 秒最长等待和手动保存
-- 串行保存队列、故障安全原子替换、外部修改检测和冲突副本
-- 10 秒恢复快照与异常会话恢复提示
-- Excalidraw、PNG、SVG 导出
-- 浅色、深色主题
-- Windows 自定义标题栏、应用图标和 NSIS 安装配置
-
-V0 不包含 OSS、MinIO、WebDAV、账号和多人协作。界面中的远程存储入口只展示版本规划，不会伪装成可用功能。
+- 内嵌 Excalidraw 编辑器，支持 PNG、SVG 和 Excalidraw 导出
+- 浅色、深色和跟随系统主题
+- Windows 自定义标题栏、托盘和 NSIS 安装包
 
 ## 技术栈
 
 - Electron
-- React 19
-- TypeScript
-- Vite / electron-vite
+- React 19、TypeScript
+- Vite、electron-vite
 - `@excalidraw/excalidraw`
-- SQLite / better-sqlite3
-- Zustand
-- Zod
-- Vitest
-- electron-builder
-
-## 项目结构
-
-```text
-src/
-  main/
-    database/       SQLite 索引
-    ipc/            参数校验和白名单 IPC
-    services/       工作区、文档、缩略图和恢复服务
-    storage/        StorageProvider 与本地实现
-  preload/          安全桌面 API
-  renderer/
-    src/
-      components/   工作区通用组件
-      features/     Excalidraw 适配层
-      pages/        欢迎页、工作区、编辑器和设置
-      stores/       工作区与编辑器标签状态
-      styles/       设计系统和页面样式
-  shared/           进程共享类型、通道和 Zod Schema
-docs/               架构、数据、可靠性和已知问题
-```
+- SQLite、better-sqlite3
+- Zustand、Zod
+- Vitest、Playwright、electron-builder
 
 ## 开发环境
 
 - Node.js 20 或 22
-- npm 10+
-- Windows 10/11 为主要运行和打包平台
-- Linux/macOS 可用于开发，但 Windows 安装包建议在 Windows 上生成
+- npm 10 或更高版本
+- Windows 10/11 是主要运行和打包平台；Linux/macOS 可用于开发
 
-## 安装依赖
-
-依赖中包含 Electron 下载，耗时取决于网络和本机环境。better-sqlite3 固定使用 13.0.2，Windows 使用其 Node-API 预编译模块，正常安装不需要 Visual Studio 或 node-gyp：
+安装依赖：
 
 ```bash
 npm install
 ```
 
-`postinstall` 只负责安装 Electron 二进制；打包配置也会跳过不必要的原生模块重建。
-
-## 启动
+启动开发环境：
 
 ```bash
 npm run dev
 ```
-
-首次启动后选择一个空目录、现有画布目录或坚果云本地同步目录。
 
 ## 检查与测试
 
@@ -90,17 +49,17 @@ npm test
 npm run lint
 ```
 
-Electron E2E 为可选验收项：
+测试代码按执行层级分组：`tests/unit/` 存放单元测试，`tests/integration/` 存放服务与数据库集成测试，`tests/e2e/` 存放 Playwright 端到端测试。`npm test` 只运行前两类，E2E 使用单独脚本。
+
+Electron E2E 测试需要完整安装依赖：
 
 ```bash
 npm run test:e2e
 ```
 
-SQLite 集成测试依赖完整安装后的 better-sqlite3 原生运行时。如果依赖安装未完成，测试会明确跳过该组，不影响纯存储和参数安全测试。
+## 构建与打包
 
-## 构建
-
-生成主进程、Preload 和 Renderer 产物：
+生成主进程、预加载脚本和 Renderer 产物：
 
 ```bash
 npm run build
@@ -112,22 +71,17 @@ npm run build
 npm run package:dir
 ```
 
-## Windows 安装包
-
-建议在 Windows PowerShell 中执行：
+在 Windows 上生成 NSIS 安装包：
 
 ```powershell
-npm install
-npm run typecheck
-npm test
 npm run package:win
 ```
 
-NSIS 安装包输出到 `release/`。安装器支持选择安装目录、桌面快捷方式和开始菜单快捷方式。卸载应用只删除程序和应用数据，不会删除用户选择的工作区目录。
+打包产物位于 `release/`，该目录已加入 `.gitignore`。打包前请退出正在运行的已打包应用，并避免在编辑器中展开 `release/` 目录，以免文件扫描器锁定 `app.asar`。
 
-## 数据存储位置
+## 数据位置
 
-画布正文始终位于用户选择的工作区：
+画布正文始终保存在用户选择的工作区：
 
 ```text
 <workspace>/
@@ -137,33 +91,11 @@ NSIS 安装包输出到 `release/`。安装器支持选择安装目录、桌面�
     trash/
 ```
 
-SQLite、缩略图和恢复快照位于 Electron `userData`：
-
-```text
-userData/
-  canvasdesk.db
-  thumbnails/
-  recovery/
-```
-
-Windows 默认位于 `%APPDATA%/画伴 CanvasDesk/` 附近，最终目录由 Electron 的 `app.getPath("userData")` 决定。
-
-## 文件格式
-
-主文件为标准 Excalidraw JSON，包含 `type`、`version`、`source`、`elements`、`appState` 和 `files`。收藏、最近打开、删除记录等应用元数据只保存到 SQLite，不污染画布正文。
+SQLite 数据库、缩略图和恢复快照保存在 Electron 的 `userData` 目录，Windows 默认位于 `%APPDATA%/my-excaildraw-local/` 附近。实际路径由 `app.getPath("userData")` 决定。
 
 ## 隐私
 
-V0 不包含遥测，不上传画布内容、文件名、路径、图片或凭证。坚果云模式只读写其本地同步目录，跨设备同步由坚果云客户端完成。
-
-## 进一步文档
-
-- [架构说明](docs/architecture.md)
-- [StorageProvider](docs/storage-provider.md)
-- [SQLite 数据库](docs/database.md)
-- [自动保存、冲突与恢复](docs/reliability.md)
-- [测试与验收](docs/testing.md)
-- [已知问题与 V1 建议](docs/known-issues.md)
+应用不包含遥测，不会上传画布内容、文件名、路径、图片或凭证。坚果云模式只读写其本地同步目录，跨设备同步由坚果云客户端完成。
 
 ## 许可证
 

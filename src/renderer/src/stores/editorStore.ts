@@ -8,6 +8,7 @@ export interface EditorTab {
   name: string;
   relativePath: string;
   isFavorite: boolean;
+  isDraft: boolean;
   saveStatus: EditorSaveStatus;
   saveError: string | null;
   openedAt: number;
@@ -22,13 +23,14 @@ interface PersistedEditorState {
 interface EditorState {
   tabs: EditorTab[];
   activeDocumentId: string | null;
-  openDocument(document: Pick<EditorTab, "documentId" | "name" | "relativePath" | "isFavorite">): void;
+  openDocument(document: Pick<EditorTab, "documentId" | "name" | "relativePath" | "isFavorite"> & Partial<Pick<EditorTab, "isDraft">>): void;
   activateDocument(documentId: string): void;
   closeDocument(documentId: string): void;
   reorderTabs(fromIndex: number, toIndex: number): void;
   replaceDocumentId(documentId: string, replacement: Pick<EditorTab, "documentId" | "name" | "relativePath" | "isFavorite">, saveStatus?: EditorSaveStatus, saveError?: string | null): void;
   updateDocumentMetadata(document: Pick<EditorTab, "documentId" | "name" | "relativePath" | "isFavorite">): void;
   updateSaveStatus(documentId: string, status: EditorSaveStatus, error?: string | null): void;
+  updateDraftStatus(documentId: string, isDraft: boolean): void;
   hydrate(documents: CanvasDocument[]): void;
 }
 
@@ -50,12 +52,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   openDocument: (document) => {
     const existing = get().tabs.find((tab) => tab.documentId === document.documentId);
     if (existing) {
-      set({ activeDocumentId: document.documentId });
+      const tabs = document.isDraft
+        ? get().tabs.map((tab) => tab.documentId === document.documentId ? { ...tab, isDraft: true } : tab)
+        : get().tabs;
+      set({ tabs, activeDocumentId: document.documentId });
       persist(get().tabs, document.documentId);
       return;
     }
     const tab: EditorTab = {
       ...document,
+      isDraft: document.isDraft ?? false,
       saveStatus: "saved",
       saveError: null,
       openedAt: Date.now()
@@ -120,6 +126,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       )
     }),
 
+  updateDraftStatus: (documentId, isDraft) =>
+    set({
+      tabs: get().tabs.map((tab) =>
+        tab.documentId === documentId ? { ...tab, isDraft } : tab
+      )
+    }),
+
   hydrate: (documents) => {
     if (get().tabs.length > 0) return;
     try {
@@ -133,6 +146,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           name: document.name,
           relativePath: document.relativePath,
           isFavorite: document.isFavorite,
+          isDraft: false,
           saveStatus: "saved" as const,
           saveError: null,
           openedAt: Date.now()

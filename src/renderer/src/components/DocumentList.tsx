@@ -40,7 +40,10 @@ export function DocumentList({
           tabIndex={0}
           onClick={(event) => {
             onSelect(document.id, event);
-            if (event.detail === 2) onOpen(document.id);
+          }}
+          onClickCapture={(event) => {
+            const target = event.target as Element;
+            if (event.detail === 2 && !target.closest(".document-quick-actions")) onOpen(document.id);
           }}
           onContextMenu={(event) => onContextMenu(event, document.id)}
           onKeyDown={(event) => {

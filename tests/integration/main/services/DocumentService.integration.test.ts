@@ -4,11 +4,16 @@ import { resolve } from "node:path";
 import { createRequire } from "node:module";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ExcalidrawFile } from "@shared/types";
-import { DatabaseService } from "../database/DatabaseService";
-import { DocumentService } from "./DocumentService";
-import { RecoveryService } from "./RecoveryService";
-import { ThumbnailService } from "./ThumbnailService";
-import { WorkspaceService } from "./WorkspaceService";
+import { DatabaseService } from "@main/database/DatabaseService";
+import { DocumentService } from "@main/services/DocumentService";
+import { RecoveryService } from "@main/services/RecoveryService";
+import { ThumbnailService } from "@main/services/ThumbnailService";
+import { WorkspaceService } from "@main/services/WorkspaceService";
+
+
+
+
+
 
 const require = createRequire(import.meta.url);
 const hasSqliteRuntime = (() => {

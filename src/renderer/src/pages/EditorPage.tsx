@@ -37,21 +37,23 @@ type SaveStatus = "saved" | "saving" | "dirty" | "error" | "conflict";
 
 interface EditorLocationState {
   initialContent?: DocumentContent;
+  isDraft?: boolean;
 }
 
 const adapter = new ExcalidrawAdapter();
 
 interface EditorPageProps {
   documentId?: string;
+  isDraft?: boolean;
   embedded?: boolean;
   active?: boolean;
   onClose?: () => void;
   registerSave?: (documentId: string, save: () => Promise<boolean>) => () => void;
   registerClose?: (documentId: string, close: () => Promise<void>) => () => void;
-  registerDiscard?: (documentId: string, discard: () => void) => () => void;
+  registerDiscard?: (documentId: string, discard: () => Promise<void>) => () => void;
 }
 
-export function EditorPage({ documentId: embeddedDocumentId, embedded = false, active = true, onClose, registerSave, registerClose, registerDiscard }: EditorPageProps) {
+export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, embedded = false, active = true, onClose, registerSave, registerClose, registerDiscard }: EditorPageProps) {
   const routeParams = useParams();
   const documentId = embeddedDocumentId ?? routeParams.documentId;
   const location = useLocation();
@@ -60,18 +62,20 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
   const updateDocumentMetadata = useEditorStore((state) => state.updateDocumentMetadata);
   const replaceEditorDocument = useEditorStore((state) => state.replaceDocumentId);
   const updateSaveStatus = useEditorStore((state) => state.updateSaveStatus);
+  const updateDraftStatus = useEditorStore((state) => state.updateDraftStatus);
   const locationState = location.state as EditorLocationState | null;
   const initialContent =
     locationState?.initialContent &&
     locationState.initialContent.document.id === documentId
       ? locationState.initialContent
       : null;
+  const initialIsDraft = Boolean(isDraft || (locationState?.isDraft && initialContent));
   const [documentContent, setDocumentContent] =
     useState<DocumentContent | null>(initialContent);
   const [document, setDocument] = useState<CanvasDocument | null>(
     documentContent?.document ?? null
   );
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>(initialIsDraft ? "dirty" : "saved");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -83,10 +87,13 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
   const sceneRef = useRef<ExcalidrawFile | null>(
     documentContent?.sceneData ?? null
   );
+  const serializedSceneRef = useRef<string | null>(null);
+
   const sceneRuntimeRef = useRef<CanvasScene | null>(null);
   const versionRef = useRef(documentContent?.version ?? "");
   const sessionIdRef = useRef(documentContent?.sessionId ?? "");
-  const dirtyRef = useRef(false);
+  const dirtyRef = useRef(initialIsDraft);
+  const draftRef = useRef(initialIsDraft);
   const revisionRef = useRef(0);
   const saveCoreRef = useRef<((snapshot: SaveSnapshot) => Promise<boolean>) | null>(null);
   const saveOutcomeRef = useRef<SaveOutcome | null>(null);
@@ -114,7 +121,10 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
     [documentId]
   );
 
-  useEffect(() => () => saveCoordinator.dispose(), [saveCoordinator]);
+  useEffect(() => {
+    saveCoordinator.activate();
+    return () => saveCoordinator.dispose();
+  }, [saveCoordinator]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -132,6 +142,7 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
         setDocument(content.document);
         setNameDraft(content.document.name);
         sceneRef.current = content.sceneData;
+        serializedSceneRef.current = null;
         sceneRuntimeRef.current = null;
         versionRef.current = content.version;
         sessionIdRef.current = content.sessionId;
@@ -235,6 +246,7 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
           setDocument(conflictContent.document);
           setNameDraft(conflictContent.document.name);
           sceneRef.current = conflictContent.sceneData;
+          serializedSceneRef.current = null;
           sceneRuntimeRef.current = null;
           versionRef.current = conflictContent.version;
           sessionIdRef.current = conflictContent.sessionId;
@@ -248,6 +260,8 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
         }
         versionRef.current = result.version;
         setDocument(result.document);
+        draftRef.current = false;
+        updateDraftStatus(result.document.id, false);
         dirtyRef.current = revisionRef.current !== revisionToSave;
         setSaveStatus(dirtyRef.current ? "dirty" : "saved");
         void saveThumbnail();
@@ -257,14 +271,14 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
         const saved = await saveOperation;
         return saved && !dirtyRef.current;
       } catch (error) {
-        const message = error instanceof Error ? error.message : "保存失败";
+        const message = error instanceof Error ? error.message : String(error || "保存失败");
         setSaveStatus("error");
         setSaveError(message);
         await saveRecoverySnapshot().catch(() => undefined);
         return false;
       }
     },
-    [document, navigate, replaceEditorDocument, saveRecoverySnapshot, saveThumbnail]
+    [document, navigate, replaceEditorDocument, saveRecoverySnapshot, saveThumbnail, updateDraftStatus]
   );
 
   saveCoreRef.current = (snapshot) => performSaveOnce(true, snapshot);
@@ -293,11 +307,18 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
     return registerClose(document.id, closeSession);
   }, [closeSession, document, embedded, registerClose]);
 
-  const discardChanges = useCallback(() => {
+  const discardChanges = useCallback(async () => {
     dirtyRef.current = false;
     saveCoordinator.dispose();
     setSaveStatus("saved");
-  }, [saveCoordinator]);
+    if (draftRef.current && document) {
+      await closeSession();
+      await window.desktopApi.documents.trash(document.id);
+      await window.desktopApi.documents.deletePermanently(document.id);
+      draftRef.current = false;
+      await refreshWorkspace();
+    }
+  }, [closeSession, document, refreshWorkspace, saveCoordinator]);
 
   useEffect(() => {
     if (!embedded || !document || !registerDiscard) return;
@@ -354,8 +375,8 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
     if (!pendingLeave) return;
     const action = pendingLeave;
     setPendingLeave(null);
-    discardChanges();
     void window.desktopApi.recovery.discard(document?.id ?? "").catch(() => undefined)
+      .then(() => discardChanges())
       .then(() => finishLeave(action));
   }, [discardChanges, document?.id, finishLeave, pendingLeave]);
 
@@ -411,17 +432,6 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
   }, [closeEmbeddedDocument, document, embedded]);
 
   useEffect(() => {
-    if (!embedded || !document) return;
-    const handleRenameRequest = (event: Event): void => {
-      if ((event as CustomEvent<string>).detail === document.id) {
-        setIsRenaming(true);
-      }
-    };
-    window.addEventListener("canvasdesk:request-rename", handleRenameRequest);
-    return () => window.removeEventListener("canvasdesk:request-rename", handleRenameRequest);
-  }, [document, embedded]);
-
-  useEffect(() => {
     if (!document) return;
     updateDocumentMetadata({
       documentId: document.id,
@@ -453,8 +463,11 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
   ): void => {
     if (!documentContent) return;
     const scene = { elements, appState, files };
+    const serializedScene = adapter.serializeScene(scene);
     sceneRuntimeRef.current = scene;
-    sceneRef.current = adapter.fromScene(scene);
+    if (serializedScene === serializedSceneRef.current) return;
+    sceneRef.current = JSON.parse(serializedScene) as ExcalidrawFile;
+    serializedSceneRef.current = serializedScene;
     if (!editorReadyRef.current) return;
     dirtyRef.current = true;
     revisionRef.current += 1;
@@ -670,10 +683,19 @@ export function EditorPage({ documentId: embeddedDocumentId, embedded = false, a
           initialData={adapter.toInitialData(documentContent.sceneData)}
           excalidrawAPI={(api) => {
             sceneRuntimeRef.current = adapter.getScene(api);
-            const initialScene = sceneRuntimeRef.current;
-            if (initialScene) sceneRef.current = adapter.fromScene(initialScene);
-            editorReadyRef.current = true;
-            saveCoordinator.markBaseline();
+            // 仅在画布首次就绪时建立保存基线，避免状态更新后的回调重置未保存 revision。
+            if (!editorReadyRef.current && sceneRuntimeRef.current) {
+              const serializedScene = adapter.serializeScene(sceneRuntimeRef.current);
+              sceneRef.current = JSON.parse(serializedScene) as ExcalidrawFile;
+              serializedSceneRef.current = serializedScene;
+              editorReadyRef.current = true;
+              if (draftRef.current) {
+                revisionRef.current += 1;
+                saveCoordinator.markChanged();
+              } else {
+                saveCoordinator.markBaseline();
+              }
+            }
           }}
           onChange={handleSceneChange}
           langCode="zh-CN"

@@ -19,6 +19,9 @@
     ],
     "baseUrl": ".",
     "paths": {
+      "@main/*": [
+        "src/main/*"
+      ],
       "@shared/*": [
         "src/shared/*"
       ],
@@ -31,6 +34,7 @@
     "src",
     "electron.vite.config.ts",
     "vitest.config.ts",
-    "eslint.config.js"
+    "eslint.config.js",
+    "tests/**/*.ts"
   ]
 }

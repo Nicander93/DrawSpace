@@ -27,15 +27,18 @@ export class ExcalidrawAdapter {
     };
   }
 
+  /** 序列化真正会写入 .excalidraw 文件的画布内容。 */
+  serializeScene(scene: CanvasScene): string {
+    return serializeAsJSON(
+      scene.elements,
+      scene.appState,
+      scene.files,
+      "local"
+    );
+  }
+
   fromScene(scene: CanvasScene): ExcalidrawFile {
-    return JSON.parse(
-      serializeAsJSON(
-        scene.elements,
-        scene.appState,
-        scene.files,
-        "local"
-      )
-    ) as ExcalidrawFile;
+    return JSON.parse(this.serializeScene(scene)) as ExcalidrawFile;
   }
 
   getScene(api: ExcalidrawImperativeAPI): CanvasScene {

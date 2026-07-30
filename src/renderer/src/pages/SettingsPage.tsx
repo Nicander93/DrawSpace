@@ -47,12 +47,6 @@ export function SettingsPage() {
         <WindowControls />
       </header>
       <main>
-        <aside>
-          <h1>设置</h1>
-          <button className="is-active" type="button">常规</button>
-          <button type="button">存储与工作区</button>
-          <button type="button">关于画伴</button>
-        </aside>
         <div className="settings-content">
           <section>
             <h2>外观</h2>
@@ -111,7 +105,7 @@ export function SettingsPage() {
           <section>
             <h2>隐私</h2>
             <div className="privacy-note">
-              画伴 V0 不收集画布内容、文件名或文件路径。所有画布都保存在你选择的目录中。
+              画布与应用数据保存在本地，画布文件位于你选择的工作区目录中。
             </div>
           </section>
         </div>

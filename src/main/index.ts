@@ -6,9 +6,13 @@ import {
   app,
   BrowserWindow,
   dialog,
+  ipcMain,
+  Menu,
   net,
+  nativeImage,
   protocol,
-  shell
+  shell,
+  Tray
 } from "electron";
 import { appCloseResponseSchema, documentIdSchema } from "@shared/schemas";
 import { IPC_CHANNELS } from "@shared/channels";
@@ -37,6 +41,55 @@ let mainWindow: BrowserWindow | null = null;
 let database: DatabaseService | null = null;
 let workspaceService: WorkspaceService | null = null;
 let logger: AppLogger | null = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+const closeController = new CloseHandshakeController(randomUUID);
+
+const showMainWindow = (): void => {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.focus();
+};
+
+const requestApplicationQuit = (): void => {
+  isQuitting = true;
+  showMainWindow();
+  app.quit();
+};
+
+const createTray = (): void => {
+  if (tray) return;
+  const iconPath = app.isPackaged
+    ? join(process.resourcesPath, "tray-icon.png")
+    : join(__dirname, "../../build/tray-icon.png");
+  const icon = nativeImage.createFromPath(iconPath).resize({
+    width: process.platform === "darwin" ? 18 : 24,
+    height: process.platform === "darwin" ? 18 : 24
+  });
+  if (process.platform === "darwin") {
+    icon.setTemplateImage(true);
+  }
+  tray = new Tray(icon);
+  tray.setToolTip("my-excaildraw-local");
+  tray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: "显示主窗口",
+      click: showMainWindow
+    },
+    { type: "separator" },
+    {
+      label: "退出",
+      click: requestApplicationQuit
+    }
+  ]));
+  tray.on("double-click", showMainWindow);
+};
 
 const createWindow = (): void => {
   mainWindow = new BrowserWindow({
@@ -46,6 +99,7 @@ const createWindow = (): void => {
     minHeight: 680,
     show: false,
     frame: false,
+    icon: app.isPackaged ? undefined : join(__dirname, "../../build/icon.ico"),
     backgroundColor: "#f7f6f3",
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
@@ -58,29 +112,45 @@ const createWindow = (): void => {
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
   });
-  const closeController = new CloseHandshakeController(randomUUID);
+  if (!app.isPackaged) {
+    mainWindow.webContents.on("before-input-event", (event, input) => {
+      if (input.type === "keyDown" && (input.key === "F12" || input.code === "F12")) {
+        event.preventDefault();
+        mainWindow?.webContents.toggleDevTools();
+      }
+    });
+  }
   mainWindow.on("close", (event) => {
-    if (mainWindow?.isDestroyed()) {
+    const window = mainWindow;
+    if (!window || window.isDestroyed()) {
       return;
     }
     if (closeController.isWindowCloseAllowed()) {
       return;
     }
     event.preventDefault();
-    const request = closeController.begin("window-close");
-    if (request) mainWindow?.webContents.send(IPC_CHANNELS.appCloseRequested, request);
-  });
-  mainWindow.webContents.on("ipc-message", (_event, channel, ...args) => {
-    if (channel === IPC_CHANNELS.appCloseResponded) {
-      const parsedResponse = appCloseResponseSchema.safeParse(args[0]);
-      if (!parsedResponse.success) return;
-      if (closeController.respond(parsedResponse.data) === "proceed") {
-        mainWindow?.close();
-      }
+    if (!isQuitting) {
+      window.hide();
       return;
     }
+    showMainWindow();
+    const request = closeController.begin("app-quit");
+    if (request) window.webContents.send(IPC_CHANNELS.appCloseRequested, request);
   });
+  const handleCloseResponse = (event: Electron.IpcMainEvent, response: unknown): void => {
+    if (event.sender !== mainWindow?.webContents) return;
+    const parsedResponse = appCloseResponseSchema.safeParse(response);
+    if (!parsedResponse.success) return;
+    const result = closeController.respond(parsedResponse.data);
+    if (result === "proceed") {
+      app.quit();
+    } else if (result === "cancel") {
+      isQuitting = false;
+    }
+  };
+  ipcMain.on(IPC_CHANNELS.appCloseResponded, handleCloseResponse);
   mainWindow.on("closed", () => {
+    ipcMain.removeListener(IPC_CHANNELS.appCloseResponded, handleCloseResponse);
     mainWindow = null;
   });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -187,6 +257,7 @@ const initializeApplication = async (): Promise<void> => {
   });
 
   createWindow();
+  createTray();
 };
 
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
@@ -194,30 +265,24 @@ if (!hasSingleInstanceLock) {
   app.quit();
 } else {
   app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) {
-        mainWindow.restore();
-      }
-      mainWindow.focus();
-    }
+    showMainWindow();
   });
 
   void app
     .whenReady()
     .then(async () => {
-      app.setAppUserModelId("com.canvasdesk.app");
+      app.setName("my-excaildraw-local");
+      app.setAppUserModelId("local.my-excaildraw");
       await initializeApplication();
 
       app.on("activate", () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-          createWindow();
-        }
+        showMainWindow();
       });
     })
     .catch((error) => {
       logger?.error("app.start.failed", error);
       dialog.showErrorBox(
-        "画伴启动失败",
+        "应用启动失败",
         error instanceof Error ? error.message : "无法初始化应用数据"
       );
       app.quit();
@@ -232,13 +297,13 @@ process.on("unhandledRejection", (error) => {
   logger?.error("app.unhandled-rejection", error);
 });
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+app.on("before-quit", () => {
+  isQuitting = true;
 });
 
 app.on("will-quit", () => {
+  tray?.destroy();
+  tray = null;
   logger?.info("app.quit");
   void workspaceService?.dispose();
   database?.close();

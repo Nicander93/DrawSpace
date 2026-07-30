@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { CloseHandshakeController } from "./CloseHandshakeController";
+import { CloseHandshakeController } from "@main/lifecycle/CloseHandshakeController";
+
 
 describe("CloseHandshakeController", () => {
   test("deduplicates requests and ignores stale responses", () => {

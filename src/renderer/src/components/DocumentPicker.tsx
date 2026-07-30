@@ -1,3 +1,4 @@
+import { FilePlus2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CanvasDocument } from "@shared/types";
 import type { EditorTab } from "../stores/editorStore";
@@ -7,10 +8,12 @@ interface DocumentPickerProps {
   documents: CanvasDocument[];
   tabs: EditorTab[];
   onOpen(document: CanvasDocument): void;
+  onCreate(): void;
   onClose(): void;
 }
 
-export function DocumentPicker({ documents, tabs, onOpen, onClose }: DocumentPickerProps) {
+/** 供编辑器标签栏选择或新建画布。 */
+export function DocumentPicker({ documents, tabs, onOpen, onCreate, onClose }: DocumentPickerProps) {
   const [search, setSearch] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const results = useMemo(() => documents.filter((document) =>
@@ -20,8 +23,21 @@ export function DocumentPicker({ documents, tabs, onOpen, onClose }: DocumentPic
     const document = results[highlightedIndex];
     if (document) onOpen(document);
   };
+
   return (
-    <Modal title="打开画布" onClose={onClose} footer={<button className="button" type="button" onClick={onClose}>取消</button>}>
+    <Modal
+      title="打开画布"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="button" type="button" onClick={onClose}>取消</button>
+          <button className="button button--primary" type="button" onClick={onCreate}>
+            <FilePlus2 size={16} />
+            新建画布
+          </button>
+        </>
+      }
+    >
       <input
         className="document-picker__search"
         autoFocus

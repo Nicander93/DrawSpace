@@ -1,10 +1,9 @@
 {
-  "name": "canvasdesk",
+  "name": "my-excaildraw-local",
   "version": "0.1.0",
   "private": true,
-  "description": "本地优先的 Excalidraw 桌面画布工作区",
+  "description": "本地 Excalidraw 桌面画布工具",
   "main": "out/main/index.js",
-  "author": "CanvasDesk",
   "license": "MIT",
   "config": {
     "electron_mirror": "https://cdn.npmmirror.com/binaries/electron/"
@@ -52,8 +51,8 @@
     "vitest": "^2.1.8"
   },
   "build": {
-    "appId": "com.canvasdesk.app",
-    "productName": "画伴 CanvasDesk",
+    "appId": "local.my-excaildraw",
+    "productName": "my-excaildraw-local",
     "asar": true,
     "npmRebuild": false,
     "asarUnpack": [
@@ -62,6 +61,12 @@
     "files": [
       "out/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/tray-icon.png",
+        "to": "tray-icon.png"
+      }
     ],
     "directories": {
       "output": "release",
@@ -78,7 +83,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "画伴"
+      "shortcutName": "my-excaildraw-local"
+    },
+    "electronDownload": {
+      "mirror": "https://cdn.npmmirror.com/binaries/electron/"
     }
   }
 }

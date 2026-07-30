@@ -6,9 +6,11 @@ interface DocumentCardProps {
   document: CanvasDocument;
   selected: boolean;
   onSelect(event: React.MouseEvent): void;
+  onToggleSelection(): void;
   onOpen(): void;
   onToggleFavorite(): void;
   onContextMenu(event: React.MouseEvent): void;
+  onDragStart(event: React.DragEvent, documentId: string): void;
 }
 
 const formatRelativeTime = (timestamp: number): string => {
@@ -30,18 +32,21 @@ export function DocumentCard({
   document,
   selected,
   onSelect,
+  onToggleSelection,
   onOpen,
   onToggleFavorite,
+  onDragStart,
   onContextMenu
 }: DocumentCardProps) {
   const thumbnailUrl = `canvasdesk://thumbnail/${document.id}?v=${document.modifiedAt}`;
 
   const handleClick = (event: React.MouseEvent): void => {
     onSelect(event);
-    // Electron can occasionally skip React's synthetic dblclick event on a
-    // card after the first click updates selection. MouseEvent.detail is
-    // delivered with the click itself and remains reliable in that case.
-    if (event.detail === 2) onOpen();
+  };
+
+  const handleClickCapture = (event: React.MouseEvent): void => {
+    const target = event.target as Element;
+    if (event.detail === 2 && !target.closest(".document-quick-actions, .document-card__checkbox")) onOpen();
   };
 
   return (
@@ -49,7 +54,10 @@ export function DocumentCard({
       className={`document-card ${selected ? "is-selected" : ""}`}
       tabIndex={0}
       role="button"
+      draggable
+      onDragStart={(event) => onDragStart(event, document.id)}
       onClick={handleClick}
+      onClickCapture={handleClickCapture}
       onContextMenu={onContextMenu}
       onKeyDown={(event) => {
         if (event.key === "Enter") {
@@ -58,6 +66,14 @@ export function DocumentCard({
       }}
     >
       <div className="document-card__preview">
+        <input
+          className="document-card__checkbox"
+          type="checkbox"
+          checked={selected}
+          aria-label={`选择画布 ${document.name}`}
+          onClick={(event) => event.stopPropagation()}
+          onChange={onToggleSelection}
+        />
         <img
           src={thumbnailUrl}
           alt=""
