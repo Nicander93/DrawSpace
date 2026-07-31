@@ -32,6 +32,7 @@ import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useEditorStore } from "../stores/editorStore";
 import { DocumentSaveCoordinator } from "../features/editor/DocumentSaveCoordinator";
 import type { SaveOutcome, SaveSnapshot } from "../features/editor/saveTypes";
+import { useTheme } from "../features/theme/ThemeContext";
 
 type SaveStatus = "saved" | "saving" | "dirty" | "error" | "conflict";
 
@@ -63,6 +64,7 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
   const replaceEditorDocument = useEditorStore((state) => state.replaceDocumentId);
   const updateSaveStatus = useEditorStore((state) => state.updateSaveStatus);
   const updateDraftStatus = useEditorStore((state) => state.updateDraftStatus);
+  const { theme } = useTheme();
   const locationState = location.state as EditorLocationState | null;
   const initialContent =
     locationState?.initialContent &&
@@ -700,8 +702,7 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
           onChange={handleSceneChange}
           langCode="zh-CN"
           name={document.name}
-          viewModeEnabled={!active}
-          theme={documentContent.sceneData.appState.theme === "dark" ? "dark" : "light"}
+          theme={theme}
           UIOptions={{
             canvasActions: {
               loadScene: false,

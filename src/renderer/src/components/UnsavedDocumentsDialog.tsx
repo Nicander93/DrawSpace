@@ -21,8 +21,8 @@ export function UnsavedDocumentsDialog({ tabs, intent = "exit", error, busy = fa
       footer={
         <>
           <button className="button" type="button" disabled={busy} onClick={onCancel}>取消</button>
-          <button className="button button--danger" type="button" disabled={busy} onClick={onDiscard}>{leavingWorkspace ? "不保存并返回" : closingTabs ? "不保存并关闭" : "放弃修改并退出"}</button>
-          <button className="button button--primary" type="button" disabled={busy} onClick={onSaveAll}>{leavingWorkspace ? "保存并返回" : closingTabs ? "保存并关闭" : "全部保存并退出"}</button>
+          <button className="button button--danger" type="button" disabled={busy} onClick={onDiscard}>不保存</button>
+          <button className="button button--primary" type="button" disabled={busy} onClick={onSaveAll}>保存</button>
         </>
       }
     >

@@ -9,6 +9,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { WelcomePage } from "./pages/WelcomePage";
 import { WorkspacePage } from "./pages/WorkspacePage";
 import { useWorkspaceStore } from "./stores/workspaceStore";
+import { ThemeProvider } from "./features/theme/ThemeContext";
 
 function AppShell() {
   const location = useLocation();
@@ -41,13 +42,6 @@ export default function App() {
   }, [initialize]);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem("canvasdesk-theme") ?? "system";
-    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.dataset.theme =
-      savedTheme === "system" ? (systemDark ? "dark" : "light") : savedTheme;
-  }, []);
-
-  useEffect(() => {
     if (!workspace?.isAvailable) {
       setRecoveryItems([]);
       return;
@@ -73,7 +67,8 @@ export default function App() {
   }
 
   return (
-    <AppCloseProvider>
+    <ThemeProvider>
+      <AppCloseProvider>
       <Routes>
         <Route path="/" element={<AppShell />} />
         <Route path="/editor/:documentId" element={<AppShell />} />
@@ -86,6 +81,7 @@ export default function App() {
           onItemsChange={setRecoveryItems}
         />
       )}
-    </AppCloseProvider>
+      </AppCloseProvider>
+    </ThemeProvider>
   );
 }

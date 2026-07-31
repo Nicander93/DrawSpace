@@ -124,13 +124,13 @@ select {
 }
 
 .button--primary {
-  border-color: var(--coral);
+  border-color: var(--blue);
   color: white;
-  background: var(--coral);
+  background: var(--blue);
 }
 
 .button--primary:hover:not(:disabled) {
-  background: var(--coral-dark);
+  background: color-mix(in srgb, var(--blue) 82%, black);
 }
 
 .button--danger,

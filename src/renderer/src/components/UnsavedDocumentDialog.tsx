@@ -17,8 +17,8 @@ export function UnsavedDocumentDialog({ documentName, error, busy = false, onSav
       footer={
         <>
           <button className="button" type="button" disabled={busy} onClick={onCancel}>取消</button>
-          <button className="button button--danger" type="button" disabled={busy} onClick={onDiscard}>不保存并继续</button>
-          <button className="button button--primary" type="button" autoFocus disabled={busy} onClick={onSave}>{busy ? "正在保存…" : "保存并继续"}</button>
+          <button className="button button--danger" type="button" disabled={busy} onClick={onDiscard}>不保存</button>
+          <button className="button button--primary" type="button" autoFocus disabled={busy} onClick={onSave}>保存</button>
         </>
       }
     >

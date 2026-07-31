@@ -8,32 +8,20 @@ import {
   Sun,
   Monitor
 } from "lucide-react";
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WindowControls } from "../components/WindowControls";
 import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useAppCloseHandler } from "../features/lifecycle/AppCloseContext";
-
-type Theme = "light" | "dark" | "system";
+import { useTheme } from "../features/theme/ThemeContext";
 
 export function SettingsPage() {
   const navigate = useNavigate();
   const { workspace, chooseWorkspace } = useWorkspaceStore();
-  const [theme, setTheme] = useState<Theme>(
-    (localStorage.getItem("canvasdesk-theme") as Theme | null) ?? "system"
-  );
+  const { preference, setPreference } = useTheme();
 
   useAppCloseHandler((request) =>
     window.desktopApi.lifecycle.respondToClose({ requestId: request.requestId, decision: "proceed" })
   );
-
-  const changeTheme = (nextTheme: Theme): void => {
-    setTheme(nextTheme);
-    localStorage.setItem("canvasdesk-theme", nextTheme);
-    const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.dataset.theme =
-      nextTheme === "system" ? (systemDark ? "dark" : "light") : nextTheme;
-  };
 
   return (
     <div className="settings-page">
@@ -60,12 +48,12 @@ export function SettingsPage() {
                 <button
                   type="button"
                   key={value}
-                  className={theme === value ? "is-active" : ""}
-                  onClick={() => changeTheme(value)}
+                  className={preference === value ? "is-active" : ""}
+                  onClick={() => setPreference(value)}
                 >
                   <Icon size={21} />
                   <span>{label}</span>
-                  {theme === value && <Check size={16} />}
+                  {preference === value && <Check size={16} />}
                 </button>
               ))}
             </div>
