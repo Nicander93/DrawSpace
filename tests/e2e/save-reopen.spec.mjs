@@ -65,6 +65,29 @@ test("Ctrl+S saves and a recent card reopens the canvas", async () => {
     await expect(recentCard.locator(".document-card__checkbox")).not.toBeChecked();
     await recentCard.dblclick({ position: { x: 80, y: 80 } });
     await expect(page.locator(".editor-canvas")).toBeVisible();
+    await expect(page.locator(".editor-workspace__save-status--saved")).toContainText("已保存");
+
+    await page.locator(".editor-workspace__back").click();
+    await expect(page.locator(".workspace-page")).toBeVisible();
+    await expect(page.locator(".modal")).toHaveCount(0);
+
+    await application.evaluate(({ app }) => app.exit(0));
+    application = await electron.launch({
+      args: [".", `--user-data-dir=${profilePath}`, "--disable-gpu", "--disable-crash-reporter", "--no-sandbox"],
+      env: {
+        ...process.env,
+        CANVASDESK_E2E_WORKSPACE: workspacePath
+      }
+    });
+    const reopenedPage = await application.firstWindow();
+    await expect(reopenedPage.locator(".workspace-page")).toBeVisible();
+    await reopenedPage.locator(".document-card").filter({ hasText: saved.document.name }).dblclick({ position: { x: 80, y: 80 } });
+    await expect(reopenedPage.locator(".editor-canvas")).toBeVisible();
+    await expect(reopenedPage.locator(".editor-workspace__save-status--saved")).toContainText("已保存");
+
+    await reopenedPage.locator(".editor-workspace__back").click();
+    await expect(reopenedPage.locator(".workspace-page")).toBeVisible();
+    await expect(reopenedPage.locator(".modal")).toHaveCount(0);
   } finally {
     await application?.evaluate(({ app }) => app.exit(0)).catch(() => undefined);
     await rm(workspacePath, { recursive: true, force: true });

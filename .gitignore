@@ -8,6 +8,7 @@ coverage/
 .DS_Store
 *:Zone.Identifier
 
+test-results/
 # Local editor and AI assistant metadata.
 .cursor/
 .agents/

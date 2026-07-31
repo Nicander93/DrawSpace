@@ -470,7 +470,18 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
     if (serializedScene === serializedSceneRef.current) return;
     sceneRef.current = JSON.parse(serializedScene) as ExcalidrawFile;
     serializedSceneRef.current = serializedScene;
-    if (!editorReadyRef.current) return;
+    if (!editorReadyRef.current) {
+      // Excalidraw 会先交付 API，再把 initialData 应用到画布。以首次 onChange
+      // 中的完整场景建立基线，避免把冷启动时短暂的空画布当成已保存内容。
+      editorReadyRef.current = true;
+      if (draftRef.current) {
+        revisionRef.current += 1;
+        saveCoordinator.markChanged();
+      } else {
+        saveCoordinator.markBaseline();
+      }
+      return;
+    }
     dirtyRef.current = true;
     revisionRef.current += 1;
     saveCoordinator.markChanged();
@@ -685,19 +696,6 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
           initialData={adapter.toInitialData(documentContent.sceneData)}
           excalidrawAPI={(api) => {
             sceneRuntimeRef.current = adapter.getScene(api);
-            // 仅在画布首次就绪时建立保存基线，避免状态更新后的回调重置未保存 revision。
-            if (!editorReadyRef.current && sceneRuntimeRef.current) {
-              const serializedScene = adapter.serializeScene(sceneRuntimeRef.current);
-              sceneRef.current = JSON.parse(serializedScene) as ExcalidrawFile;
-              serializedSceneRef.current = serializedScene;
-              editorReadyRef.current = true;
-              if (draftRef.current) {
-                revisionRef.current += 1;
-                saveCoordinator.markChanged();
-              } else {
-                saveCoordinator.markBaseline();
-              }
-            }
           }}
           onChange={handleSceneChange}
           langCode="zh-CN"
