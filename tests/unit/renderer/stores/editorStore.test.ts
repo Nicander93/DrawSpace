@@ -40,7 +40,7 @@ describe("editorStore", () => {
   });
 
   test("hydrates persisted tab order and drops missing documents", () => {
-    localStorage.setItem("canvasdesk-editor-tabs", JSON.stringify({
+    localStorage.setItem("drawspace-editor-tabs", JSON.stringify({
       openDocumentIds: ["c", "missing", "a"],
       tabOrder: ["c", "missing", "a"],
       activeDocumentId: "c"

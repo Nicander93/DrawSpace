@@ -5,8 +5,7 @@ import type { AppCloseResponse, DesktopApi } from "@shared/types";
 const desktopApi: DesktopApi = {
   workspace: {
     getActive: () => ipcRenderer.invoke(IPC_CHANNELS.workspaceGetActive),
-    choose: (providerType) =>
-      ipcRenderer.invoke(IPC_CHANNELS.workspaceChoose, providerType),
+    choose: () => ipcRenderer.invoke(IPC_CHANNELS.workspaceChoose),
     rescan: () => ipcRenderer.invoke(IPC_CHANNELS.workspaceRescan),
     listDirectories: () =>
       ipcRenderer.invoke(IPC_CHANNELS.workspaceListDirectories),

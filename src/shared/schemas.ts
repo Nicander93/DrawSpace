@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { WORKSPACE_META_DIR } from "./brand";
 
 export const documentIdSchema = z.string().uuid();
 
@@ -6,8 +7,6 @@ export const appCloseResponseSchema = z.object({
   requestId: z.string().uuid(),
   decision: z.enum(["proceed", "cancel"])
 });
-
-export const workspaceProviderTypeSchema = z.enum(["local", "nutstore"]);
 
 export const documentListQuerySchema = z.object({
   filter: z.enum(["home", "recent", "favorites", "all", "trash"]),
@@ -37,7 +36,9 @@ export const relativeDirectorySchema = z
         .every(
           (part) =>
             !part.startsWith(".") &&
-            !["node_modules", ".canvasdesk", ".git"].includes(part.toLowerCase())
+            !["node_modules", WORKSPACE_META_DIR, ".git"].includes(
+              part.toLowerCase()
+            )
         ),
     "不能使用隐藏目录或内部管理目录"
   );

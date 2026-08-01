@@ -34,7 +34,7 @@ interface EditorState {
   hydrate(documents: CanvasDocument[]): void;
 }
 
-const STORAGE_KEY = "canvasdesk-editor-tabs";
+const STORAGE_KEY = "drawspace-editor-tabs";
 
 const persist = (tabs: EditorTab[], activeDocumentId: string | null): void => {
   const value: PersistedEditorState = {

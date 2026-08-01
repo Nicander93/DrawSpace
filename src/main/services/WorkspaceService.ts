@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { basename, extname } from "node:path";
+import { WORKSPACE_META_DIR } from "@shared/brand";
 import type { DocumentListResult, Workspace, WorkspaceProviderType } from "@shared/types";
 import { DatabaseService } from "../database/DatabaseService";
 import { LocalStorageProvider } from "../storage/LocalStorageProvider";
@@ -19,11 +20,13 @@ const hashData = (data: Uint8Array): string =>
   createHash("sha256").update(data).digest("hex");
 
 export class WorkspaceService {
+  // 当前激活的工作区
   private activeWorkspace: Workspace | null = null;
   private storageProvider: LocalStorageProvider | null = null;
   private stopWatcher: (() => Promise<void> | void) | null = null;
   private scanTimer: NodeJS.Timeout | null = null;
-  private activeScan: Promise<DocumentListResult> | null = null;
+  /** 进行中的全量扫描；存在即表示 isScanning */
+  private scanPromise: Promise<DocumentListResult> | null = null;
   private readonly indexChangedListeners = new Set<() => void>();
 
   constructor(
@@ -77,16 +80,17 @@ export class WorkspaceService {
   ): Promise<Workspace> {
     this.logger?.info("workspace.open.start", { providerType });
     await this.stopActiveWatcher();
-    await this.activeScan?.catch(() => undefined);
+    await this.scanPromise?.catch(() => undefined);
     const provider = new LocalStorageProvider(rootPath);
     await provider.initialize();
-    await provider.createDirectory(".canvasdesk/trash");
+    await provider.createDirectory(`${WORKSPACE_META_DIR}/trash`);
 
     let metadata: WorkspaceMetadata | null = null;
-    if (await provider.exists(".canvasdesk/workspace.json")) {
+    const metadataPath = `${WORKSPACE_META_DIR}/workspace.json`;
+    if (await provider.exists(metadataPath)) {
       try {
         metadata = JSON.parse(
-          decodeText(await provider.read(".canvasdesk/workspace.json"))
+          decodeText(await provider.read(metadataPath))
         ) as WorkspaceMetadata;
       } catch {
         metadata = null;
@@ -101,7 +105,7 @@ export class WorkspaceService {
         createdAt: new Date().toISOString()
       };
       await provider.write(
-        ".canvasdesk/workspace.json",
+        metadataPath,
         encodeText(JSON.stringify(metadata, null, 2))
       );
     }
@@ -124,15 +128,19 @@ export class WorkspaceService {
   }
 
   scan(): Promise<DocumentListResult> {
-    if (this.activeScan) {
-      return this.activeScan;
+    // 已有扫描在进行时复用同一 Promise，避免并发全量扫描
+    if (this.scanPromise) {
+      return this.scanPromise;
     }
-    this.activeScan = this.performScan().finally(() => {
-      this.activeScan = null;
+    this.scanPromise = this.performScan().finally(() => {
+      this.scanPromise = null;
     });
-    return this.activeScan;
+    return this.scanPromise;
   }
 
+  /**
+   * 执行全量扫描
+   */
   private async performScan(): Promise<DocumentListResult> {
     const workspace = this.requireActiveWorkspace();
     const provider = this.getStorageProvider();
@@ -145,12 +153,16 @@ export class WorkspaceService {
     const relativePaths = canvasEntries.map((entry) => entry.path);
     const activeRelativePaths = new Set(relativePaths);
 
+    /**
+     * 批量处理文件
+     */
     for (let index = 0; index < canvasEntries.length; index += 24) {
       const entryBatch = canvasEntries.slice(index, index + 24);
       await Promise.all(
         entryBatch.map(async (entry) => {
           try {
             const fileData = await provider.read(entry.path);
+            // 更新数据库
             this.database.upsertScannedDocument({
               workspaceId: workspace.id,
               name: basename(entry.name, ".excalidraw"),
@@ -170,10 +182,12 @@ export class WorkspaceService {
       );
     }
 
+    // 更新可见excalidraw文件集合
     const indexedDocuments = this.database.listDocuments(workspace.id, {
       filter: "all",
       limit: 100_000
     }).documents;
+
     await Promise.all(
       indexedDocuments.map(async (document) => {
         if (
@@ -184,12 +198,14 @@ export class WorkspaceService {
         }
       })
     );
+    // 从数据库中删除已不存在的文档
     this.database.deleteMissingDocuments(workspace.id, [...activeRelativePaths]);
     this.logger?.info("workspace.scan.success", {
       workspaceId: workspace.id,
       documentCount: relativePaths.length
     });
     this.indexChangedListeners.forEach((listener) => listener());
+    // 返回最新文档列表，默认按修改时间排序
     return this.database.listDocuments(workspace.id, {
       filter: "all",
       sort: "modified"
@@ -222,6 +238,9 @@ export class WorkspaceService {
     return () => this.indexChangedListeners.delete(listener);
   }
 
+  /**
+   * 启动文件系统监视器
+   */
   private async startWatcher(): Promise<void> {
     const provider: StorageProvider = this.getStorageProvider();
     if (!provider.watch) {
@@ -257,7 +276,7 @@ export class WorkspaceService {
       return;
     }
     const provider = this.getStorageProvider();
-    let changed = false;
+    let hasChanged = false;
 
     for (const [relativePath, eventType] of batch) {
       if (eventType === "deleted") {
@@ -267,7 +286,7 @@ export class WorkspaceService {
         );
         if (existing && !existing.isDeleted) {
           this.database.deleteDocument(existing.id);
-          changed = true;
+          hasChanged = true;
         }
         continue;
       }
@@ -287,7 +306,7 @@ export class WorkspaceService {
           modifiedAt: entry.modifiedAt ?? Date.now(),
           contentHash: hashData(fileData)
         });
-        changed = true;
+        hasChanged = true;
       } catch (error) {
         this.logger?.warn("workspace.watch.file-skipped", {
           reason: error instanceof Error ? error.message : "unknown read error"
@@ -295,7 +314,7 @@ export class WorkspaceService {
       }
     }
 
-    if (changed) {
+    if (hasChanged) {
       this.indexChangedListeners.forEach((listener) => listener());
     }
   }

@@ -1,4 +1,5 @@
 import { FileWarning, Pin, Star } from "lucide-react";
+import { PROTOCOL_SCHEME } from "@shared/brand";
 import type { CanvasDocument } from "@shared/types";
 import { DocumentQuickActions } from "./DocumentQuickActions";
 
@@ -38,7 +39,7 @@ export function DocumentCard({
   onDragStart,
   onContextMenu
 }: DocumentCardProps) {
-  const thumbnailUrl = `canvasdesk://thumbnail/${document.id}?v=${document.modifiedAt}`;
+  const thumbnailUrl = `${PROTOCOL_SCHEME}://thumbnail/${document.id}?v=${document.modifiedAt}`;
 
   const handleClick = (event: React.MouseEvent): void => {
     onSelect(event);

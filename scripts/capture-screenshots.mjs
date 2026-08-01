@@ -69,8 +69,8 @@ const samples = [
         y: 155,
         width: 100,
         height: 30,
-        text: "客户端",
-        originalText: "客户端",
+        text: "客户�?,
+        originalText: "客户�?,
         fontSize: 24,
         fontFamily: 1,
         textAlign: "center",
@@ -113,8 +113,8 @@ const samples = [
         y: 145,
         width: 130,
         height: 50,
-        text: "DrawSpace\n本地工作区",
-        originalText: "DrawSpace\n本地工作区",
+        text: "DrawSpace\n本地工作�?,
+        originalText: "DrawSpace\n本地工作�?,
         fontSize: 20,
         fontFamily: 1,
         textAlign: "center",
@@ -195,8 +195,8 @@ const samples = [
     ])
   },
   {
-    name: "产品路线图",
-    relativePath: "产品设计/产品路线图.excalidraw",
+    name: "产品路线�?,
+    relativePath: "产品设计/产品路线�?excalidraw",
     scene: scene([
       element({
         id: "title",
@@ -205,8 +205,8 @@ const samples = [
         y: 60,
         width: 280,
         height: 40,
-        text: "产品路线图",
-        originalText: "产品路线图",
+        text: "产品路线�?,
+        originalText: "产品路线�?,
         fontSize: 32,
         fontFamily: 1,
         textAlign: "left",
@@ -233,8 +233,8 @@ const samples = [
         y: 175,
         width: 150,
         height: 50,
-        text: "Q1\n工作区管理",
-        originalText: "Q1\n工作区管理",
+        text: "Q1\n工作区管�?,
+        originalText: "Q1\n工作区管�?,
         fontSize: 20,
         fontFamily: 1,
         textAlign: "center",
@@ -260,8 +260,8 @@ const samples = [
         y: 175,
         width: 140,
         height: 50,
-        text: "Q2\n多标签编辑",
-        originalText: "Q2\n多标签编辑",
+        text: "Q2\n多标签编�?,
+        originalText: "Q2\n多标签编�?,
         fontSize: 20,
         fontFamily: 1,
         textAlign: "center",
@@ -287,8 +287,8 @@ const samples = [
         y: 175,
         width: 140,
         height: 50,
-        text: "Q3\n回收站恢复",
-        originalText: "Q3\n回收站恢复",
+        text: "Q3\n回收站恢�?,
+        originalText: "Q3\n回收站恢�?,
         fontSize: 20,
         fontFamily: 1,
         textAlign: "center",
@@ -350,8 +350,8 @@ const samples = [
         y: 360,
         width: 320,
         height: 80,
-        text: "• 自动保存\n• 冲突副本\n• 不上传云端",
-        originalText: "• 自动保存\n• 冲突副本\n• 不上传云端",
+        text: "�?自动保存\n�?冲突副本\n�?不上传云�?,
+        originalText: "�?自动保存\n�?冲突副本\n�?不上传云�?,
         fontSize: 20,
         fontFamily: 1,
         textAlign: "left",
@@ -363,8 +363,8 @@ const samples = [
     ])
   },
   {
-    name: "快速草稿",
-    relativePath: "快速草稿.excalidraw",
+    name: "快速草�?,
+    relativePath: "快速草�?excalidraw",
     scene: scene([
       element({
         id: "draft-box",
@@ -383,8 +383,8 @@ const samples = [
         y: 190,
         width: 140,
         height: 30,
-        text: "快速草稿",
-        originalText: "快速草稿",
+        text: "快速草�?,
+        originalText: "快速草�?,
         fontSize: 24,
         fontFamily: 1,
         textAlign: "center",
@@ -399,8 +399,8 @@ const samples = [
 
 async function launchApp({ workspacePath, profilePath }) {
   const env = { ...process.env };
-  if (workspacePath) env.CANVASDESK_E2E_WORKSPACE = workspacePath;
-  else delete env.CANVASDESK_E2E_WORKSPACE;
+  if (workspacePath) env.DRAWSPACE_E2E_WORKSPACE = workspacePath;
+  else delete env.DRAWSPACE_E2E_WORKSPACE;
 
   const application = await electron.launch({
     cwd: root,
@@ -509,7 +509,7 @@ async function main() {
   try {
     ({ application } = await launchApp({ workspacePath: null, profilePath: welcomeProfile }));
     let page = await application.firstWindow();
-    await page.getByRole("heading", { name: "选择工作区" }).waitFor({ state: "visible", timeout: 20_000 });
+    await page.getByRole("heading", { name: "选择工作�? }).waitFor({ state: "visible", timeout: 20_000 });
     await settle(page, 1000);
     await capture(page, "welcome.png");
     await application.close();
@@ -562,7 +562,7 @@ async function main() {
     await page.getByRole("button", { name: "深色" }).click();
     await settle(page, 400);
     await capture(page, "settings-dark.png");
-    await page.getByRole("button", { name: "返回工作区" }).click();
+    await page.getByRole("button", { name: "返回工作�? }).click();
     await page
       .locator(".app-shell-surface.is-visible .workspace-sidebar")
       .waitFor({ state: "visible" });

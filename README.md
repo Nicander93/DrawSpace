@@ -26,7 +26,7 @@ DrawSpace 是一款基于 Electron 和 Excalidraw 的本地桌面画布管理工
 
 ![深色主题](assets/screenshots/workspace-dark.png)
 
-首次启动时选择本地工作区或坚果云同步目录：
+首次启动时选择工作区目录：
 
 ![选择工作区](assets/screenshots/welcome.png)
 
@@ -61,14 +61,14 @@ DrawSpace 是一款基于 Electron 和 Excalidraw 的本地桌面画布管理工
 ```text
 <workspace>/
   *.excalidraw
-  .canvasdesk/
+  .drawspace/
     workspace.json
     trash/
 ```
 
 SQLite 数据库、缩略图、日志和恢复快照保存在 Electron 的 `userData` 目录。在 Windows 上通常位于 `%APPDATA%/DrawSpace/`，实际路径由 `app.getPath("userData")` 决定。
 
-DrawSpace 不包含遥测，不会主动上传画布内容、文件名、路径、图片或凭证。使用坚果云等同步工具时，跨设备同步由对应的本地同步客户端完成。
+DrawSpace 不包含遥测，不会主动上传画布内容、文件名、路径、图片或凭证。若将工作区放在同步盘目录中，跨设备同步由对应的本地同步客户端完成。
 
 ## 常见问题
 

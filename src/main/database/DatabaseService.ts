@@ -11,7 +11,7 @@ import type {
 interface WorkspaceRow {
   id: string;
   name: string;
-  provider_type: WorkspaceProviderType;
+  provider_type: string;
   root_path: string;
   created_at: number;
   last_opened_at: number;
@@ -51,7 +51,8 @@ export interface IndexedDocumentInput {
 const mapWorkspace = (row: WorkspaceRow, isAvailable = true): Workspace => ({
   id: row.id,
   name: row.name,
-  providerType: row.provider_type,
+  // 历史 nutstore 等记录统一视为 local
+  providerType: "local",
   rootPath: row.root_path,
   createdAt: row.created_at,
   lastOpenedAt: row.last_opened_at,
@@ -230,6 +231,11 @@ export class DatabaseService {
     return document;
   }
 
+  /**
+   * 删除磁盘上已不存在的文档索引。
+   * @param workspaceId 工作区 ID
+   * @param relativePaths 当前仍存在文件的相对路径集合；不在此集合中文档将被移出索引
+   */
   deleteMissingDocuments(workspaceId: string, relativePaths: string[]): void {
     const activePaths = new Set(relativePaths);
     const rows = this.database

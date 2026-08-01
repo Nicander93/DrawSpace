@@ -1,4 +1,4 @@
-import { Cloud, FolderOpen, Plus } from "lucide-react";
+import { FolderOpen, Plus } from "lucide-react";
 import type { Workspace } from "@shared/types";
 import { Brand } from "../components/Brand";
 import { WindowControls } from "../components/WindowControls";
@@ -24,36 +24,25 @@ export function WelcomePage({ unavailableWorkspace }: WelcomePageProps) {
         <p>
           {unavailableWorkspace
             ? `无法访问“${unavailableWorkspace.name}”，请选择它的新位置或打开其他工作区。`
-            : "选择一个文件夹存放 .excalidraw 文件。"}
+            : "选择一个文件夹存放 .excalidraw 文件。也可选用同步盘中的目录。"}
         </p>
         <div className="welcome-actions">
           <button
             className="welcome-option welcome-option--primary"
             type="button"
-            onClick={() => void chooseWorkspace("local")}
+            onClick={() => void chooseWorkspace()}
           >
             <span><Plus size={23} /></span>
             <div>
-              <strong>打开本地工作区</strong>
+              <strong>打开工作区</strong>
               <small>选择本地文件夹</small>
-            </div>
-          </button>
-          <button
-            className="welcome-option"
-            type="button"
-            onClick={() => void chooseWorkspace("nutstore")}
-          >
-            <span><Cloud size={23} /></span>
-            <div>
-              <strong>打开坚果云同步目录</strong>
-              <small>由坚果云客户端负责同步</small>
             </div>
           </button>
           {unavailableWorkspace && (
             <button
               className="welcome-option"
               type="button"
-              onClick={() => void chooseWorkspace("local")}
+              onClick={() => void chooseWorkspace()}
             >
               <span><FolderOpen size={23} /></span>
               <div>

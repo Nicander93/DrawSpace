@@ -4,8 +4,8 @@ import { resolve } from "node:path";
 import { _electron as electron, expect, test } from "@playwright/test";
 
 test("clicking a sidebar folder filters the workspace", async () => {
-  const workspacePath = await mkdtemp(resolve(tmpdir(), "canvasdesk-folder-e2e-"));
-  const profilePath = await mkdtemp(resolve(tmpdir(), "canvasdesk-profile-e2e-"));
+  const workspacePath = await mkdtemp(resolve(tmpdir(), "drawspace-folder-e2e-"));
+  const profilePath = await mkdtemp(resolve(tmpdir(), "drawspace-profile-e2e-"));
   let application;
 
   try {
@@ -16,15 +16,15 @@ test("clicking a sidebar folder filters the workspace", async () => {
     );
     application = await electron.launch({
       args: [".", `--user-data-dir=${profilePath}`, "--disable-gpu", "--disable-crash-reporter", "--no-sandbox"],
-      env: { ...process.env, CANVASDESK_E2E_WORKSPACE: workspacePath }
+      env: { ...process.env, DRAWSPACE_E2E_WORKSPACE: workspacePath }
     });
     const page = await application.firstWindow();
-    await expect(page.getByRole("button", { name: "打开文件夹 测试" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "打开文件�?测试" })).toBeVisible();
 
-    await page.getByRole("button", { name: "打开文件夹 测试" }).click();
+    await page.getByRole("button", { name: "打开文件�?测试" }).click();
 
     await expect(page.locator(".workspace-search input")).toHaveValue("测试");
-    await expect(page.getByRole("heading", { name: "搜索“测试”" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "搜索“测试�? })).toBeVisible();
     await expect(page.locator(".document-card").filter({ hasText: "目录画布" })).toBeVisible();
   } finally {
     await application?.evaluate(({ app }) => app.exit(0)).catch(() => undefined);
@@ -34,14 +34,14 @@ test("clicking a sidebar folder filters the workspace", async () => {
 });
 
 test("workspace actions do not overlap the sort control", async () => {
-  const workspacePath = await mkdtemp(resolve(tmpdir(), "canvasdesk-layout-e2e-"));
-  const profilePath = await mkdtemp(resolve(tmpdir(), "canvasdesk-profile-e2e-"));
+  const workspacePath = await mkdtemp(resolve(tmpdir(), "drawspace-layout-e2e-"));
+  const profilePath = await mkdtemp(resolve(tmpdir(), "drawspace-profile-e2e-"));
   let application;
 
   try {
     application = await electron.launch({
       args: [".", `--user-data-dir=${profilePath}`, "--disable-gpu", "--disable-crash-reporter", "--no-sandbox"],
-      env: { ...process.env, CANVASDESK_E2E_WORKSPACE: workspacePath }
+      env: { ...process.env, DRAWSPACE_E2E_WORKSPACE: workspacePath }
     });
     const page = await application.firstWindow();
     await page.getByRole("button", { name: "全部画布" }).click();

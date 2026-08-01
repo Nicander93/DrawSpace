@@ -38,9 +38,9 @@ describe.skipIf(!hasSqliteRuntime)("DocumentService 本地工作区", () => {
   let documentService: DocumentService;
 
   beforeEach(async () => {
-    testRootPath = await mkdtemp(resolve(tmpdir(), "canvasdesk-service-"));
+    testRootPath = await mkdtemp(resolve(tmpdir(), "drawspace-service-"));
     workspacePath = resolve(testRootPath, "workspace");
-    database = new DatabaseService(resolve(testRootPath, "canvasdesk.db"));
+    database = new DatabaseService(resolve(testRootPath, "drawspace.db"));
     workspaceService = new WorkspaceService(database);
     recoveryService = new RecoveryService(
       testRootPath,

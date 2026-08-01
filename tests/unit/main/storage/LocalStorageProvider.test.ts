@@ -12,7 +12,7 @@ describe("LocalStorageProvider", () => {
   let provider: LocalStorageProvider;
 
   beforeEach(async () => {
-    workspacePath = await mkdtemp(resolve(tmpdir(), "canvasdesk-storage-"));
+    workspacePath = await mkdtemp(resolve(tmpdir(), "drawspace-storage-"));
     provider = new LocalStorageProvider(workspacePath);
     await provider.initialize();
   });
@@ -56,7 +56,7 @@ describe("LocalStorageProvider", () => {
       "second"
     );
     const names = await readdir(workspacePath);
-    expect(names.some((name) => name.includes("canvasdesk-backup") || name.endsWith(".tmp"))).toBe(false);
+    expect(names.some((name) => name.includes("drawspace-backup") || name.endsWith(".tmp"))).toBe(false);
   });
 
   it("预期版本不一致时停止覆盖", async () => {
@@ -78,23 +78,23 @@ describe("LocalStorageProvider", () => {
 
   it("recovers an interrupted backup before the next write", async () => {
     await provider.write("画布.excalidraw", new TextEncoder().encode("old"));
-    await writeFile(resolve(workspacePath, ".画布.excalidraw.canvasdesk-backup"), "backup");
+    await writeFile(resolve(workspacePath, ".画布.excalidraw.drawspace-backup"), "backup");
     await rm(resolve(workspacePath, "画布.excalidraw"));
 
     await provider.write("画布.excalidraw", new TextEncoder().encode("new"));
     expect(await readFile(resolve(workspacePath, "画布.excalidraw"), "utf8")).toBe("new");
-    await expect(readdir(workspacePath)).resolves.not.toContain(".画布.excalidraw.canvasdesk-backup");
+    await expect(readdir(workspacePath)).resolves.not.toContain(".画布.excalidraw.drawspace-backup");
   });
 
   it("递归扫描时排除内部和隐藏目录", async () => {
     await provider.write("正常/一.excalidraw", new TextEncoder().encode("{}"));
-    await provider.write(".canvasdesk/trash/二.excalidraw", new TextEncoder().encode("{}"));
+    await provider.write(".drawspace/trash/二.excalidraw", new TextEncoder().encode("{}"));
     await provider.write(".hidden/三.excalidraw", new TextEncoder().encode("{}"));
 
     const result = await provider.list("", { recursive: true });
     expect(result.entries.map((entry) => entry.path)).toContain("正常/一.excalidraw");
     expect(
-      result.entries.some((entry) => entry.path.includes(".canvasdesk"))
+      result.entries.some((entry) => entry.path.includes(".drawspace"))
     ).toBe(false);
     expect(result.entries.some((entry) => entry.path.includes(".hidden"))).toBe(
       false

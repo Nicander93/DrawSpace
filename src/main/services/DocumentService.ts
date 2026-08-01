@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { basename, posix } from "node:path";
+import { WORKSPACE_META_DIR } from "@shared/brand";
 import { excalidrawFileSchema } from "@shared/schemas";
 import type {
   CanvasDocument,
@@ -266,7 +267,7 @@ export class DocumentService {
   async trash(documentId: string): Promise<void> {
     const document = this.requireDocument(documentId);
     const provider = this.workspaceService.getStorageProvider();
-    const trashPath = `.canvasdesk/trash/${document.id}-${basename(document.relativePath)}`;
+    const trashPath = `${WORKSPACE_META_DIR}/trash/${document.id}-${basename(document.relativePath)}`;
     await provider.move(document.relativePath, trashPath);
     this.database.moveToTrash(document.id, document.relativePath, trashPath);
   }

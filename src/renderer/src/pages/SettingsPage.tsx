@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   Check,
-  Cloud,
   FolderOpen,
   HardDrive,
   Moon,
@@ -74,18 +73,10 @@ export function SettingsPage() {
               <button
                 className="button"
                 type="button"
-                onClick={() => void chooseWorkspace("local")}
+                onClick={() => void chooseWorkspace()}
               >
                 <FolderOpen size={16} />
-                切换本地工作区
-              </button>
-              <button
-                className="button"
-                type="button"
-                onClick={() => void chooseWorkspace("nutstore")}
-              >
-                <Cloud size={16} />
-                选择坚果云目录
+                切换工作区
               </button>
             </div>
           </section>

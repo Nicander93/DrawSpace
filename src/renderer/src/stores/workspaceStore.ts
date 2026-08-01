@@ -4,8 +4,7 @@ import type {
   DocumentFilter,
   DocumentSort,
   DocumentView,
-  Workspace,
-  WorkspaceProviderType
+  Workspace
 } from "@shared/types";
 
 interface WorkspaceState {
@@ -27,7 +26,7 @@ interface WorkspaceState {
   selectedDocumentIds: string[];
   anchorDocumentId: string | null;
   initialize(): Promise<void>;
-  chooseWorkspace(providerType?: WorkspaceProviderType): Promise<boolean>;
+  chooseWorkspace(): Promise<boolean>;
   refresh(): Promise<void>;
   rescan(): Promise<void>;
   setFilter(filter: DocumentFilter): void;
@@ -99,9 +98,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 
-  chooseWorkspace: async (providerType = "local") => {
+  chooseWorkspace: async () => {
     try {
-      const workspace = await window.desktopApi.workspace.choose(providerType);
+      const workspace = await window.desktopApi.workspace.choose();
       if (!workspace) {
         return false;
       }

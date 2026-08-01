@@ -1,5 +1,6 @@
 import { appendFile, mkdir, rename, stat, unlink } from "node:fs/promises";
 import { resolve } from "node:path";
+import { LOG_FILENAME, LOG_ROTATED_FILENAME } from "@shared/brand";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -10,7 +11,7 @@ export class AppLogger {
 
   constructor(userDataPath: string) {
     this.logDirectory = resolve(userDataPath, "logs");
-    this.logPath = resolve(this.logDirectory, "canvasdesk.log");
+    this.logPath = resolve(this.logDirectory, LOG_FILENAME);
   }
 
   async initialize(): Promise<void> {
@@ -18,7 +19,7 @@ export class AppLogger {
     try {
       const logStat = await stat(this.logPath);
       if (logStat.size > 5 * 1024 * 1024) {
-        const previousLogPath = resolve(this.logDirectory, "canvasdesk.1.log");
+        const previousLogPath = resolve(this.logDirectory, LOG_ROTATED_FILENAME);
         await unlink(previousLogPath).catch(() => undefined);
         await rename(this.logPath, previousLogPath);
       }

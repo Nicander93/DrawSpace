@@ -6,8 +6,8 @@ import { resolve } from "node:path";
 import { _electron as electron, expect, test } from "@playwright/test";
 
 test("Ctrl+S saves and a recent card reopens the canvas", async () => {
-  const workspacePath = await mkdtemp(resolve(tmpdir(), "canvasdesk-save-e2e-"));
-  const profilePath = await mkdtemp(resolve(tmpdir(), "canvasdesk-profile-e2e-"));
+  const workspacePath = await mkdtemp(resolve(tmpdir(), "drawspace-save-e2e-"));
+  const profilePath = await mkdtemp(resolve(tmpdir(), "drawspace-profile-e2e-"));
   let application;
 
   try {
@@ -15,7 +15,7 @@ test("Ctrl+S saves and a recent card reopens the canvas", async () => {
       args: [".", `--user-data-dir=${profilePath}`, "--disable-gpu", "--disable-crash-reporter", "--no-sandbox"],
       env: {
         ...process.env,
-        CANVASDESK_E2E_WORKSPACE: workspacePath
+        DRAWSPACE_E2E_WORKSPACE: workspacePath
       }
     });
     const page = await application.firstWindow();
@@ -50,7 +50,7 @@ test("Ctrl+S saves and a recent card reopens the canvas", async () => {
     expect(saveState).toEqual({
       elementCount: 1,
       statusClass: "editor-workspace__save-status editor-workspace__save-status--saved",
-      statusText: "已保存",
+      statusText: "已保�?,
       error: null
     });
 
@@ -65,7 +65,7 @@ test("Ctrl+S saves and a recent card reopens the canvas", async () => {
     await expect(recentCard.locator(".document-card__checkbox")).not.toBeChecked();
     await recentCard.dblclick({ position: { x: 80, y: 80 } });
     await expect(page.locator(".editor-canvas")).toBeVisible();
-    await expect(page.locator(".editor-workspace__save-status--saved")).toContainText("已保存");
+    await expect(page.locator(".editor-workspace__save-status--saved")).toContainText("已保�?);
 
     await page.locator(".editor-workspace__back").click();
     await expect(page.locator(".workspace-page")).toBeVisible();
@@ -76,14 +76,14 @@ test("Ctrl+S saves and a recent card reopens the canvas", async () => {
       args: [".", `--user-data-dir=${profilePath}`, "--disable-gpu", "--disable-crash-reporter", "--no-sandbox"],
       env: {
         ...process.env,
-        CANVASDESK_E2E_WORKSPACE: workspacePath
+        DRAWSPACE_E2E_WORKSPACE: workspacePath
       }
     });
     const reopenedPage = await application.firstWindow();
     await expect(reopenedPage.locator(".workspace-page")).toBeVisible();
     await reopenedPage.locator(".document-card").filter({ hasText: saved.document.name }).dblclick({ position: { x: 80, y: 80 } });
     await expect(reopenedPage.locator(".editor-canvas")).toBeVisible();
-    await expect(reopenedPage.locator(".editor-workspace__save-status--saved")).toContainText("已保存");
+    await expect(reopenedPage.locator(".editor-workspace__save-status--saved")).toContainText("已保�?);
 
     await reopenedPage.locator(".editor-workspace__back").click();
     await expect(reopenedPage.locator(".workspace-page")).toBeVisible();

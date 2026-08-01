@@ -1,4 +1,5 @@
-export type WorkspaceProviderType = "local" | "nutstore";
+/** 当前仅实现 local；后续可扩展其他存储后端 */
+export type WorkspaceProviderType = "local";
 
 export interface AppCloseRequest {
   requestId: string;
@@ -141,7 +142,7 @@ export interface SerializedAppError {
 export interface DesktopApi {
   workspace: {
     getActive(): Promise<Workspace | null>;
-    choose(providerType?: WorkspaceProviderType): Promise<Workspace | null>;
+    choose(): Promise<Workspace | null>;
     rescan(): Promise<DocumentListResult>;
     listDirectories(): Promise<string[]>;
     createDirectory(relativeDirectory: string): Promise<void>;

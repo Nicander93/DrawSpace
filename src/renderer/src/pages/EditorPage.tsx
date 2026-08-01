@@ -429,8 +429,8 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
       const requestedId = (event as CustomEvent<string>).detail;
       if (requestedId === document.id) void closeEmbeddedDocument();
     };
-    window.addEventListener("canvasdesk:request-close", handleCloseRequest);
-    return () => window.removeEventListener("canvasdesk:request-close", handleCloseRequest);
+    window.addEventListener("drawspace:request-close", handleCloseRequest);
+    return () => window.removeEventListener("drawspace:request-close", handleCloseRequest);
   }, [closeEmbeddedDocument, document, embedded]);
 
   useEffect(() => {

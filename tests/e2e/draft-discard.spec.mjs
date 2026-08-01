@@ -4,14 +4,14 @@ import { resolve } from "node:path";
 import { _electron as electron, expect, test } from "@playwright/test";
 
 test("discarding a new draft removes it from all canvases", async () => {
-  const workspacePath = await mkdtemp(resolve(tmpdir(), "canvasdesk-draft-e2e-"));
-  const profilePath = await mkdtemp(resolve(tmpdir(), "canvasdesk-draft-profile-"));
+  const workspacePath = await mkdtemp(resolve(tmpdir(), "drawspace-draft-e2e-"));
+  const profilePath = await mkdtemp(resolve(tmpdir(), "drawspace-draft-profile-"));
   let application;
 
   try {
     application = await electron.launch({
       args: [".", `--user-data-dir=${profilePath}`, "--disable-gpu", "--disable-crash-reporter", "--no-sandbox"],
-      env: { ...process.env, CANVASDESK_E2E_WORKSPACE: workspacePath }
+      env: { ...process.env, DRAWSPACE_E2E_WORKSPACE: workspacePath }
     });
     const page = await application.firstWindow();
     await expect(page.locator(".workspace-page")).toBeVisible();

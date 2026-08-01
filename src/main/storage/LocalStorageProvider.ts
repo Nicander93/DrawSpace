@@ -12,6 +12,7 @@ import {
 } from "node:fs/promises";
 import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import chokidar from "chokidar";
+import { BACKUP_SUFFIX, WORKSPACE_META_DIR } from "@shared/brand";
 import type {
   StorageEntry,
   StorageProvider,
@@ -21,7 +22,7 @@ import type {
 import { StorageError } from "./StorageError";
 
 const EXCLUDED_DIRECTORIES = new Set([
-  ".canvasdesk",
+  WORKSPACE_META_DIR,
   "node_modules",
   ".git",
   "system volume information"
@@ -149,7 +150,7 @@ export class LocalStorageProvider implements StorageProvider {
     await mkdir(parentPath, { recursive: true });
     const backupPath = resolve(
       parentPath,
-      `.${basename(absolutePath)}.canvasdesk-backup`
+      `.${basename(absolutePath)}${BACKUP_SUFFIX}`
     );
     await this.recoverStaleBackup(absolutePath, backupPath);
 

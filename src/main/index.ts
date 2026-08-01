@@ -14,6 +14,11 @@ import {
   shell,
   Tray
 } from "electron";
+import {
+  DATABASE_FILENAME,
+  E2E_WORKSPACE_ENV,
+  PROTOCOL_SCHEME
+} from "@shared/brand";
 import { appCloseResponseSchema, documentIdSchema } from "@shared/schemas";
 import { IPC_CHANNELS } from "@shared/channels";
 import { DatabaseService } from "./database/DatabaseService";
@@ -27,7 +32,7 @@ import { CloseHandshakeController } from "./lifecycle/CloseHandshakeController";
 
 protocol.registerSchemesAsPrivileged([
   {
-    scheme: "canvasdesk",
+    scheme: PROTOCOL_SCHEME,
     privileges: {
       standard: true,
       secure: true,
@@ -187,20 +192,28 @@ const createWindow = (): void => {
   }
 };
 
+/**
+ * 初始化应用
+ */
 const initializeApplication = async (): Promise<void> => {
   const userDataPath = app.getPath("userData");
   logger = new AppLogger(userDataPath);
   await logger.initialize();
   logger.info("app.start", { version: app.getVersion() });
-  database = new DatabaseService(join(userDataPath, "canvasdesk.db"));
+  // 初始化数据库
+  database = new DatabaseService(join(userDataPath, DATABASE_FILENAME));
   logger.info("database.migration.success");
+  // 初始化工作区服务
   workspaceService = new WorkspaceService(database, logger);
+  // 初始化恢复服务
   const recoveryService = new RecoveryService(
     userDataPath,
     database,
     workspaceService
   );
+  // 初始化缩略图服务
   const thumbnailService = new ThumbnailService(userDataPath, database);
+  // 初始化文档服务
   const documentService = new DocumentService(
     database,
     workspaceService,
@@ -214,16 +227,10 @@ const initializeApplication = async (): Promise<void> => {
     recoveryService.initialize(),
     thumbnailService.initialize()
   ]);
-  if (
-    process.env.CANVASDESK_E2E_WORKSPACE &&
-    !app.isPackaged
-  ) {
-    await workspaceService.activate(
-      process.env.CANVASDESK_E2E_WORKSPACE,
-      "local"
-    );
+  if (process.env[E2E_WORKSPACE_ENV] && !app.isPackaged) {
+    await workspaceService.activate(process.env[E2E_WORKSPACE_ENV], "local");
   }
-
+  // 注册 IPC 处理器ob
   registerIpcHandlers({
     workspaceService,
     documentService,
@@ -237,7 +244,7 @@ const initializeApplication = async (): Promise<void> => {
     }
   });
 
-  protocol.handle("canvasdesk", async (request) => {
+  protocol.handle(PROTOCOL_SCHEME, async (request) => {
     try {
       const requestUrl = new URL(request.url);
       if (requestUrl.hostname !== "thumbnail") {

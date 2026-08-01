@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { _electron as electron, expect, test } from "@playwright/test";
 
-test("创建、保存、回收站、冲突和异常恢复主流程", async () => {
-  const workspacePath = await mkdtemp(resolve(tmpdir(), "canvasdesk-e2e-"));
+test("创建、保存、回收站、冲突和异常恢复主流�?, async () => {
+  const workspacePath = await mkdtemp(resolve(tmpdir(), "drawspace-e2e-"));
   let application;
 
   try {
@@ -12,11 +12,11 @@ test("创建、保存、回收站、冲突和异常恢复主流程", async () =>
       args: [".", "--disable-gpu", "--disable-crash-reporter", "--no-sandbox"],
       env: {
         ...process.env,
-        CANVASDESK_E2E_WORKSPACE: workspacePath
+        DRAWSPACE_E2E_WORKSPACE: workspacePath
       }
     });
     let page = await application.firstWindow();
-    await expect(page.getByText("工作区", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("工作�?, { exact: true }).first()).toBeVisible();
 
     await page.getByRole("button", { name: "新建画布" }).first().click();
     await expect(page.locator(".editor-canvas")).toBeVisible();
@@ -68,13 +68,13 @@ test("创建、保存、回收站、冲突和异常恢复主流程", async () =>
     );
     expect(savedResult.status).toBe("saved");
 
-    await page.getByRole("button", { name: "工作区" }).click();
+    await page.getByRole("button", { name: "工作�? }).click();
     await expect(page.getByText(documentContent.document.name).first()).toBeVisible();
 
     await page.evaluate(async (documentId) => {
       await window.desktopApi.documents.trash(documentId);
     }, documentContent.document.id);
-    await page.getByRole("button", { name: "回收站" }).click();
+    await page.getByRole("button", { name: "回收�? }).click();
     await expect(page.getByText(documentContent.document.name).first()).toBeVisible();
     await page.evaluate(async (documentId) => {
       await window.desktopApi.documents.restore(documentId);
@@ -123,11 +123,11 @@ test("创建、保存、回收站、冲突和异常恢复主流程", async () =>
       args: [".", "--disable-gpu", "--disable-crash-reporter", "--no-sandbox"],
       env: {
         ...process.env,
-        CANVASDESK_E2E_WORKSPACE: workspacePath
+        DRAWSPACE_E2E_WORKSPACE: workspacePath
       }
     });
     page = await application.firstWindow();
-    await expect(page.getByText("找到了未保存的画布")).toBeVisible();
+    await expect(page.getByText("找到了未保存的画�?)).toBeVisible();
   } finally {
     await application?.close();
     await rm(workspacePath, { recursive: true, force: true });

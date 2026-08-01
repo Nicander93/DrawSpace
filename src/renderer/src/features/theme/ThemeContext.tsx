@@ -9,7 +9,7 @@ interface ThemeContextValue {
   setPreference: (preference: ThemePreference) => void;
 }
 
-const THEME_STORAGE_KEY = "canvasdesk-theme";
+const THEME_STORAGE_KEY = "drawspace-theme";
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 function getSystemTheme(): Theme {

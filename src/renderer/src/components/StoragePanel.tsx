@@ -26,7 +26,7 @@ export function StoragePanel({
           <HardDrive size={24} />
         </span>
         <div>
-          <strong>{workspace.providerType === "nutstore" ? "坚果云目录" : "本地工作区"}</strong>
+          <strong>本地工作区</strong>
           <p title={workspace.rootPath}>{workspace.name}</p>
           <small><i /> 已连接</small>
         </div>
