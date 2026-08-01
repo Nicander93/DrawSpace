@@ -9,6 +9,7 @@ coverage/
 *:Zone.Identifier
 
 test-results/
+.screenshot-workspace/
 # Local editor and AI assistant metadata.
 .cursor/
 .agents/

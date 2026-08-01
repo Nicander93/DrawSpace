@@ -8,6 +8,28 @@ DrawSpace 是一款基于 Electron 和 Excalidraw 的本地桌面画布管理工
 
 > DrawSpace 是第三方开源项目，与 Excalidraw 官方团队不存在隶属或授权关系。
 
+## 界面预览
+
+工作区首页，支持最近画布、收藏和本地存储状态：
+
+![工作区首页](assets/screenshots/workspace.png)
+
+内嵌 Excalidraw 编辑器，支持多标签与自动保存：
+
+![画布编辑器](assets/screenshots/editor.png)
+
+全部画布视图，可按文件夹组织，并切换卡片/列表：
+
+![全部画布](assets/screenshots/workspace-all.png)
+
+深色主题：
+
+![深色主题](assets/screenshots/workspace-dark.png)
+
+首次启动时选择本地工作区或坚果云同步目录：
+
+![选择工作区](assets/screenshots/welcome.png)
+
 ## 功能
 
 - 选择本地文件夹作为工作区，递归索引 `.excalidraw` 文件
