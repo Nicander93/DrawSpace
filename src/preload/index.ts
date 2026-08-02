@@ -97,6 +97,13 @@ const desktopApi: DesktopApi = {
       return () => ipcRenderer.removeListener(IPC_CHANNELS.appCloseRequested, handler);
     },
     respondToClose: (response: AppCloseResponse) => ipcRenderer.send(IPC_CHANNELS.appCloseResponded, response)
+  },
+  ai: {
+    getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.aiGetSettings),
+    saveSettings: (settings) => ipcRenderer.invoke(IPC_CHANNELS.aiSaveSettings, settings),
+    testConnection: (settings) => ipcRenderer.invoke(IPC_CHANNELS.aiTestConnection, settings),
+    generateMermaid: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateMermaid, request),
+    repairMermaid: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiRepairMermaid, request)
   }
 };
 

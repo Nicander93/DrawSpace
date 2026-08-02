@@ -86,3 +86,48 @@ export const exportAssetSchema = z.object({
   format: z.enum(["png", "svg"]),
   data: z.union([z.instanceof(ArrayBuffer), z.string()])
 });
+
+export const aiSettingsSchema = z.object({
+  baseUrl: z
+    .string()
+    .trim()
+    .url("模型地址格式不正确")
+    .refine(
+      (value) => value.startsWith("http://") || value.startsWith("https://"),
+      "模型地址必须使用 HTTP 或 HTTPS"
+    ),
+  model: z.string().trim().min(1, "模型名称不能为空").max(200),
+  temperature: z.number().min(0).max(2),
+  timeoutMs: z.number().int().min(5_000).max(300_000)
+});
+
+export const aiSelectionNodeSchema = z.object({
+  id: z.string().min(1).max(200),
+  label: z.string().max(500),
+  elementType: z.string().max(100)
+});
+
+export const aiSelectionEdgeSchema = z.object({
+  from: z.string().max(200).optional(),
+  to: z.string().max(200).optional(),
+  label: z.string().max(500).optional()
+});
+
+export const aiSelectionContextSchema = z.object({
+  summary: z.string().max(6_000),
+  nodes: z.array(aiSelectionNodeSchema).max(50),
+  edges: z.array(aiSelectionEdgeSchema).max(100),
+  elementCount: z.number().int().min(0).max(500)
+});
+
+export const generateMermaidRequestSchema = z.object({
+  prompt: z.string().trim().min(3).max(10_000),
+  selection: aiSelectionContextSchema.optional()
+});
+
+export const repairMermaidRequestSchema = z.object({
+  prompt: z.string().trim().min(3).max(10_000),
+  mermaid: z.string().min(1).max(50_000),
+  parseError: z.string().min(1).max(5_000),
+  selection: aiSelectionContextSchema.optional()
+});

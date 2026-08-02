@@ -26,6 +26,9 @@ import { registerIpcHandlers } from "./ipc/registerIpcHandlers";
 import { DocumentService } from "./services/DocumentService";
 import { RecoveryService } from "./services/RecoveryService";
 import { ThumbnailService } from "./services/ThumbnailService";
+import { AiSettingsService } from "./services/ai/AiSettingsService";
+import { OpenAiCompatibleClient } from "./services/ai/OpenAiCompatibleClient";
+import { AiDiagramService } from "./services/ai/AiDiagramService";
 import { WorkspaceService } from "./services/WorkspaceService";
 import { AppLogger } from "./services/AppLogger";
 import { CloseHandshakeController } from "./lifecycle/CloseHandshakeController";
@@ -221,6 +224,9 @@ const initializeApplication = async (): Promise<void> => {
     thumbnailService,
     logger
   );
+  const aiSettingsService = new AiSettingsService(userDataPath, logger);
+  const aiClient = new OpenAiCompatibleClient(logger);
+  const aiDiagramService = new AiDiagramService(aiSettingsService, aiClient, logger);
 
   await Promise.all([
     workspaceService.initialize(),
@@ -236,6 +242,7 @@ const initializeApplication = async (): Promise<void> => {
     documentService,
     recoveryService,
     thumbnailService,
+    aiDiagramService,
     logger
   });
   workspaceService.onIndexChanged(() => {

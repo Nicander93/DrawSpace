@@ -10,7 +10,7 @@ import { useWorkspaceStore } from "../stores/workspaceStore";
 import { DocumentPicker } from "../components/DocumentPicker";
 import { Modal } from "../components/Modal";
 import { UnsavedDocumentsDialog } from "../components/UnsavedDocumentsDialog";
-import { ArrowLeft, Check, Circle, FileWarning, LoaderCircle, RefreshCw } from "lucide-react";
+import { ArrowLeft, Check, Circle, FileWarning, LoaderCircle, RefreshCw, Sparkles } from "lucide-react";
 import { useAppCloseHandler } from "../features/lifecycle/AppCloseContext";
 
 interface EditorLocationState { initialContent?: DocumentContent; isDraft?: boolean }
@@ -350,6 +350,16 @@ export function EditorWorkspacePage({ visible = true }: { visible?: boolean }) {
             )}
           </div>
         )}
+        <button
+          className="button button--compact editor-workspace__ai-button"
+          type="button"
+          aria-label="AI 生成图表"
+          title="根据描述生成 Mermaid 图表，可参考当前选区"
+          onClick={() => window.dispatchEvent(new Event("drawspace:open-ai"))}
+        >
+          <Sparkles size={15} />
+          <span>AI 生成</span>
+        </button>
         <WindowControls />
       </header>
       <div className="editor-document-host">

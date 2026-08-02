@@ -34,4 +34,9 @@ export const IPC_CHANNELS = {
   windowClose: "window:close",
   appCloseRequested: "app:close-requested",
   appCloseResponded: "app:close-responded",
+  aiGetSettings: "ai:get-settings",
+  aiSaveSettings: "ai:save-settings",
+  aiTestConnection: "ai:test-connection",
+  aiGenerateMermaid: "ai:generate-mermaid",
+  aiRepairMermaid: "ai:repair-mermaid",
 } as const;

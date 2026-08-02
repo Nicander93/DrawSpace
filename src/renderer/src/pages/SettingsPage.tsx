@@ -5,18 +5,85 @@ import {
   HardDrive,
   Moon,
   Sun,
-  Monitor
+  Monitor,
+  Settings2,
+  Sparkles
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { WindowControls } from "../components/WindowControls";
 import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useAppCloseHandler } from "../features/lifecycle/AppCloseContext";
 import { useTheme } from "../features/theme/ThemeContext";
+import type { AiSettings } from "@shared/types";
+import { aiSettingsSchema } from "@shared/schemas";
+
+type AiSettingsStatus = "idle" | "loading" | "testing" | "saving" | "success" | "error";
+type SettingsCategory = "general" | "ai";
 
 export function SettingsPage() {
   const navigate = useNavigate();
   const { workspace, chooseWorkspace } = useWorkspaceStore();
   const { preference, setPreference } = useTheme();
+  const [activeCategory, setActiveCategory] = useState<SettingsCategory>("general");
+  const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
+  const [aiStatus, setAiStatus] = useState<AiSettingsStatus>("loading");
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    void window.desktopApi.ai.getSettings().then((settings) => {
+      setAiSettings(settings);
+      setAiStatus("idle");
+    }).catch((error) => {
+      setAiStatus("error");
+      setAiMessage(error instanceof Error ? error.message : "读取 AI 设置失败");
+    });
+  }, []);
+
+  const updateAiSetting = <K extends keyof AiSettings>(key: K, value: AiSettings[K]): void => {
+    setAiSettings((current) => current ? { ...current, [key]: value } : current);
+    setAiStatus("idle");
+    setAiMessage(null);
+  };
+
+  const saveAiSettings = async (): Promise<void> => {
+    if (!aiSettings) return;
+    const parsed = aiSettingsSchema.safeParse(aiSettings);
+    if (!parsed.success) {
+      setAiStatus("error");
+      setAiMessage(parsed.error.issues[0]?.message ?? "AI 设置不正确");
+      return;
+    }
+    setAiStatus("saving");
+    try {
+      const saved = await window.desktopApi.ai.saveSettings(parsed.data);
+      setAiSettings(saved);
+      setAiStatus("success");
+      setAiMessage("AI 设置已保存");
+    } catch (error) {
+      setAiStatus("error");
+      setAiMessage(error instanceof Error ? error.message : "保存 AI 设置失败");
+    }
+  };
+
+  const testAiConnection = async (): Promise<void> => {
+    if (!aiSettings) return;
+    const parsed = aiSettingsSchema.safeParse(aiSettings);
+    if (!parsed.success) {
+      setAiStatus("error");
+      setAiMessage(parsed.error.issues[0]?.message ?? "AI 设置不正确");
+      return;
+    }
+    setAiStatus("testing");
+    try {
+      const result = await window.desktopApi.ai.testConnection(parsed.data);
+      setAiStatus(result.success ? "success" : "error");
+      setAiMessage(result.message);
+    } catch (error) {
+      setAiStatus("error");
+      setAiMessage(error instanceof Error ? error.message : "连接测试失败");
+    }
+  };
 
   useAppCloseHandler((request) =>
     window.desktopApi.lifecycle.respondToClose({ requestId: request.requestId, decision: "proceed" })
@@ -34,7 +101,60 @@ export function SettingsPage() {
         <WindowControls />
       </header>
       <main>
+        <aside>
+          <nav className="settings-nav" aria-label="设置分类">
+            <button
+              className={activeCategory === "general" ? "is-active" : ""}
+              type="button"
+              aria-current={activeCategory === "general" ? "page" : undefined}
+              onClick={() => setActiveCategory("general")}
+            >
+              <Settings2 size={17} />
+              常规
+            </button>
+            <button
+              className={activeCategory === "ai" ? "is-active" : ""}
+              type="button"
+              aria-current={activeCategory === "ai" ? "page" : undefined}
+              onClick={() => setActiveCategory("ai")}
+            >
+              <Sparkles size={17} />
+              AI 图表
+            </button>
+          </nav>
+        </aside>
         <div className="settings-content">
+          {activeCategory === "ai" && <section className="settings-section--ai">
+            <h2>AI 图表</h2>
+            <p>通过本地或兼容 OpenAI API 的模型，将自然语言转换为可编辑 Mermaid 图表。</p>
+            {aiSettings && (
+              <div className="ai-settings-form">
+                <label className="field">
+                  <span>模型服务地址</span>
+                  <input value={aiSettings.baseUrl} onChange={(event) => updateAiSetting("baseUrl", event.target.value)} placeholder="http://127.0.0.1:1234/v1" />
+                  <small>LM Studio：127.0.0.1:1234/v1 · Ollama：127.0.0.1:11434/v1</small>
+                </label>
+                <label className="field">
+                  <span>模型名称</span>
+                  <input value={aiSettings.model} onChange={(event) => updateAiSetting("model", event.target.value)} placeholder="例如：qwen2.5-32b-instruct" />
+                </label>
+                <details className="ai-settings-advanced">
+                  <summary>高级设置</summary>
+                  <div>
+                    <label className="field"><span>Temperature</span><input type="number" min="0" max="2" step="0.1" value={aiSettings.temperature} onChange={(event) => updateAiSetting("temperature", Number(event.target.value))} /></label>
+                    <label className="field"><span>超时时间（毫秒）</span><input type="number" min="5000" max="300000" step="1000" value={aiSettings.timeoutMs} onChange={(event) => updateAiSetting("timeoutMs", Number(event.target.value))} /></label>
+                  </div>
+                </details>
+                <div className="settings-actions">
+                  <button className="button" type="button" onClick={() => void testAiConnection()} disabled={aiStatus === "testing" || aiStatus === "saving"}>{aiStatus === "testing" ? "正在测试…" : "测试连接"}</button>
+                  <button className="button button--primary" type="button" onClick={() => void saveAiSettings()} disabled={aiStatus === "testing" || aiStatus === "saving"}>{aiStatus === "saving" ? "正在保存…" : "保存"}</button>
+                </div>
+                {aiMessage && <p className={`settings-status settings-status--${aiStatus}`}>{aiMessage}</p>}
+              </div>
+            )}
+          </section>}
+
+          {activeCategory === "general" && <>
           <section>
             <h2>外观</h2>
             <p>选择适合你的画布工作区主题。</p>
@@ -84,9 +204,10 @@ export function SettingsPage() {
           <section>
             <h2>隐私</h2>
             <div className="privacy-note">
-              画布与应用数据保存在本地，画布文件位于你选择的工作区目录中。
+              AI 图表功能只会发送用户输入，以及用户明确选择的画布元素摘要。默认不会发送整个画布、图片、文件路径或工作区内容。数据是否离开本机取决于你配置的模型服务地址。
             </div>
           </section>
+          </>}
         </div>
       </main>
     </div>

@@ -13,7 +13,8 @@ import {
   MoreHorizontal,
   RefreshCw,
   Save,
-  Star
+  Star,
+  Sparkles
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -22,6 +23,7 @@ import type {
   DocumentContent,
   ExcalidrawFile
 } from "@shared/types";
+import type { AiSelectionContext } from "@shared/types";
 import {
   type CanvasScene,
   ExcalidrawAdapter
@@ -33,6 +35,11 @@ import { useEditorStore } from "../stores/editorStore";
 import { DocumentSaveCoordinator } from "../features/editor/DocumentSaveCoordinator";
 import type { SaveOutcome, SaveSnapshot } from "../features/editor/saveTypes";
 import { useTheme } from "../features/theme/ThemeContext";
+import { AiDiagramDialog } from "../features/ai/AiDiagramDialog";
+import { extractSelectionContext } from "../features/ai/SelectionContextExtractor";
+import { placeGeneratedDiagram } from "../features/ai/DiagramPlacement";
+import type { ConvertedMermaidDiagram } from "../features/ai/MermaidDiagramAdapter";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 type SaveStatus = "saved" | "saving" | "dirty" | "error" | "conflict";
 
@@ -85,6 +92,8 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
   const [pendingLeave, setPendingLeave] = useState<(() => void | Promise<void>) | null>(null);
   const [leaveBusy, setLeaveBusy] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [aiDialogOpen, setAiDialogOpen] = useState(false);
+  const [aiSelection, setAiSelection] = useState<AiSelectionContext | undefined>(undefined);
   const [nameDraft, setNameDraft] = useState(document?.name ?? "");
   const sceneRef = useRef<ExcalidrawFile | null>(
     documentContent?.sceneData ?? null
@@ -92,6 +101,7 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
   const serializedSceneRef = useRef<string | null>(null);
 
   const sceneRuntimeRef = useRef<CanvasScene | null>(null);
+  const excalidrawApiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const versionRef = useRef(documentContent?.version ?? "");
   const sessionIdRef = useRef(documentContent?.sessionId ?? "");
   const dirtyRef = useRef(initialIsDraft);
@@ -542,6 +552,38 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
     setExportMenuOpen(false);
   };
 
+  const openAiDialog = useCallback((): void => {
+    const api = excalidrawApiRef.current;
+    const context = api ? extractSelectionContext(api.getSceneElements(), api.getAppState().selectedElementIds) : undefined;
+    setAiSelection(context);
+    setAiDialogOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!embedded || !active) return undefined;
+    const handleOpenAi = (): void => openAiDialog();
+    window.addEventListener("drawspace:open-ai", handleOpenAi);
+    return () => window.removeEventListener("drawspace:open-ai", handleOpenAi);
+  }, [active, embedded, openAiDialog]);
+
+  const insertGeneratedDiagram = (diagram: ConvertedMermaidDiagram): void => {
+    const api = excalidrawApiRef.current;
+    if (!api) return;
+    try {
+      const currentElements = api.getSceneElements();
+      const placedElements = placeGeneratedDiagram(diagram.elements, currentElements, api.getAppState().selectedElementIds);
+      api.addFiles(Object.values(diagram.files));
+      api.updateScene({
+        elements: [...currentElements, ...placedElements],
+        appState: { selectedElementIds: Object.fromEntries(placedElements.map((element) => [element.id, true])) },
+        captureUpdate: "IMMEDIATELY"
+      });
+      setAiDialogOpen(false);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "插入 AI 图表失败");
+    }
+  };
+
   if (!documentContent || !document) {
     return (
       <div className="editor-loading">
@@ -632,6 +674,16 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
         >
           <Star size={18} fill={document.isFavorite ? "currentColor" : "none"} />
         </button>
+        <button
+          className="button button--compact editor-ai-button"
+          type="button"
+          aria-label="AI 生成图表"
+          title="AI 生成图表"
+          onClick={openAiDialog}
+        >
+          <Sparkles size={18} />
+          <span>AI 生成</span>
+        </button>
         <div className="editor-menu-wrapper">
           <button
             className="button button--primary button--compact"
@@ -695,6 +747,7 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
           key={document.id}
           initialData={adapter.toInitialData(documentContent.sceneData)}
           excalidrawAPI={(api) => {
+            excalidrawApiRef.current = api;
             sceneRuntimeRef.current = adapter.getScene(api);
           }}
           onChange={handleSceneChange}
@@ -710,6 +763,7 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
           }}
         />
       </div>
+      {aiDialogOpen && <AiDiagramDialog selection={aiSelection} onClose={() => setAiDialogOpen(false)} onInsert={insertGeneratedDiagram} />}
       {pendingLeave && document && (
         <UnsavedDocumentDialog
           documentName={document.name}

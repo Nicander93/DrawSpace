@@ -3,6 +3,7 @@ import { registerDocumentHandlers } from "./documentHandlers";
 import { registerRecoveryHandlers } from "./recoveryHandlers";
 import { registerWindowHandlers } from "./windowHandlers";
 import { registerWorkspaceHandlers } from "./workspaceHandlers";
+import { registerAiHandlers } from "./aiHandlers";
 import type { IpcServices } from "./types";
 
 export type { IpcServices } from "./types";
@@ -22,4 +23,5 @@ export const registerIpcHandlers = (services: IpcServices): void => {
     recoveryService: services.recoveryService
   });
   registerWindowHandlers();
+  registerAiHandlers(handle, services.aiDiagramService);
 };

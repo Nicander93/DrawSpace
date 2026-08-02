@@ -117,6 +117,56 @@ export interface AppSettings {
   lastWorkspaceId: string | null;
 }
 
+export interface AiSettings {
+  baseUrl: string;
+  model: string;
+  temperature: number;
+  timeoutMs: number;
+}
+
+export interface AiConnectionTestResult {
+  success: boolean;
+  message: string;
+  latencyMs?: number;
+  models?: string[];
+}
+
+export interface AiSelectionNode {
+  id: string;
+  label: string;
+  elementType: string;
+}
+
+export interface AiSelectionEdge {
+  from?: string;
+  to?: string;
+  label?: string;
+}
+
+export interface AiSelectionContext {
+  summary: string;
+  nodes: AiSelectionNode[];
+  edges: AiSelectionEdge[];
+  elementCount: number;
+}
+
+export interface GenerateMermaidRequest {
+  prompt: string;
+  selection?: AiSelectionContext;
+}
+
+export interface GenerateMermaidResult {
+  mermaid: string;
+  rawResponse: string;
+}
+
+export interface RepairMermaidRequest {
+  prompt: string;
+  mermaid: string;
+  parseError: string;
+  selection?: AiSelectionContext;
+}
+
 export interface OperationResult {
   success: boolean;
   message?: string;
@@ -193,5 +243,12 @@ export interface DesktopApi {
   lifecycle: {
     onCloseRequested(listener: (request: AppCloseRequest) => void): () => void;
     respondToClose(response: AppCloseResponse): void;
+  };
+  ai: {
+    getSettings(): Promise<AiSettings>;
+    saveSettings(settings: AiSettings): Promise<AiSettings>;
+    testConnection(settings?: AiSettings): Promise<AiConnectionTestResult>;
+    generateMermaid(request: GenerateMermaidRequest): Promise<GenerateMermaidResult>;
+    repairMermaid(request: RepairMermaidRequest): Promise<GenerateMermaidResult>;
   };
 }
