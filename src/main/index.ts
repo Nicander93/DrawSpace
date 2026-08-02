@@ -32,6 +32,9 @@ import { AiDiagramService } from "./services/ai/AiDiagramService";
 import { WorkspaceService } from "./services/WorkspaceService";
 import { AppLogger } from "./services/AppLogger";
 import { CloseHandshakeController } from "./lifecycle/CloseHandshakeController";
+import { AiAttachmentService } from "./services/ai/AiAttachmentService";
+import { AiPromptBuilder } from "./services/ai/AiPromptBuilder";
+import { AiConversationService } from "./services/ai/AiConversationService";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -227,6 +230,15 @@ const initializeApplication = async (): Promise<void> => {
   const aiSettingsService = new AiSettingsService(userDataPath, logger);
   const aiClient = new OpenAiCompatibleClient(logger);
   const aiDiagramService = new AiDiagramService(aiSettingsService, aiClient, logger);
+  database.aiConversations.markInterruptedTurns();
+  const aiConversationService = new AiConversationService(
+    database.aiConversations,
+    aiSettingsService,
+    aiClient,
+    new AiAttachmentService(userDataPath, database.aiConversations, logger),
+    new AiPromptBuilder(),
+    logger
+  );
 
   await Promise.all([
     workspaceService.initialize(),
@@ -243,6 +255,7 @@ const initializeApplication = async (): Promise<void> => {
     recoveryService,
     thumbnailService,
     aiDiagramService,
+    aiConversationService,
     logger
   });
   workspaceService.onIndexChanged(() => {

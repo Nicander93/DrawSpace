@@ -6,7 +6,8 @@ import type { AppLogger } from "../AppLogger";
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   baseUrl: "http://127.0.0.1:1234/v1",
-  model: "",
+  model: "ornith-1.0-9b",
+  visionModel: "ornith-1.0-9b",
   temperature: 0.2,
   timeoutMs: 120_000
 };
@@ -52,6 +53,7 @@ export class AiSettingsService {
       ...DEFAULT_AI_SETTINGS,
       ...(typeof candidate.baseUrl === "string" ? { baseUrl: candidate.baseUrl } : {}),
       ...(typeof candidate.model === "string" ? { model: candidate.model } : {}),
+      ...(typeof candidate.visionModel === "string" ? { visionModel: candidate.visionModel } : {}),
       ...(typeof candidate.temperature === "number" ? { temperature: candidate.temperature } : {}),
       ...(typeof candidate.timeoutMs === "number" ? { timeoutMs: candidate.timeoutMs } : {})
     };

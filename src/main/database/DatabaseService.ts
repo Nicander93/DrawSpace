@@ -7,6 +7,8 @@ import type {
   Workspace,
   WorkspaceProviderType
 } from "@shared/types";
+import { applyAiConversationMigration } from "./aiConversationMigration";
+import { AiConversationRepository } from "./AiConversationRepository";
 
 interface WorkspaceRow {
   id: string;
@@ -81,12 +83,15 @@ const mapDocument = (row: DocumentRow): CanvasDocument => ({
 
 export class DatabaseService {
   private readonly database: Database.Database;
+  readonly aiConversations: AiConversationRepository;
 
   constructor(databasePath: string) {
     this.database = new Database(databasePath);
     this.database.pragma("journal_mode = WAL");
     this.database.pragma("foreign_keys = ON");
     this.migrate();
+    applyAiConversationMigration(this.database);
+    this.aiConversations = new AiConversationRepository(this.database);
   }
 
   private migrate(): void {

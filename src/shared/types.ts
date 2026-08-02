@@ -120,6 +120,7 @@ export interface AppSettings {
 export interface AiSettings {
   baseUrl: string;
   model: string;
+  visionModel?: string;
   temperature: number;
   timeoutMs: number;
 }
@@ -132,12 +133,16 @@ export interface AiConnectionTestResult {
 }
 
 export interface AiSelectionNode {
-  id: string;
+  alias: string;
+  sourceElementId: string;
+  id?: string;
   label: string;
   elementType: string;
 }
 
 export interface AiSelectionEdge {
+  fromAlias?: string;
+  toAlias?: string;
   from?: string;
   to?: string;
   label?: string;
@@ -148,6 +153,110 @@ export interface AiSelectionContext {
   nodes: AiSelectionNode[];
   edges: AiSelectionEdge[];
   elementCount: number;
+  selectedElementCount?: number;
+  includedElementCount?: number;
+  truncated?: boolean;
+  layout?: "horizontal" | "vertical" | "free";
+}
+
+export type AiTurnMode =
+  | "create"
+  | "revise"
+  | "recreate_image"
+  | "reference_image"
+  | "extend_selection";
+
+export type AiTurnStatus = "generating" | "ready" | "error" | "cancelled";
+
+export interface AiSessionSummary {
+  id: string;
+  workspaceId: string;
+  sourceDocumentId?: string;
+  sourceDocumentName?: string;
+  title: string;
+  draftPrompt: string;
+  createdAt: number;
+  updatedAt: number;
+  turnCount: number;
+  latestTurnStatus?: AiTurnStatus;
+  latestPrompt?: string;
+}
+
+export interface AiAttachment {
+  id: string;
+  sessionId: string;
+  turnId?: string;
+  kind: "uploaded_image" | "selection_preview";
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  byteSize: number;
+  width?: number;
+  height?: number;
+  createdAt: number;
+}
+
+export interface AiImageUpload {
+  fileName: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+  data: ArrayBuffer;
+}
+
+export interface AiContextSnapshot {
+  documentId?: string;
+  documentName?: string;
+  selection?: AiSelectionContext;
+  attachmentIds: string[];
+  capturedAt: number;
+}
+
+export interface AiTurn {
+  id: string;
+  sessionId: string;
+  baseTurnId?: string;
+  mode: AiTurnMode;
+  prompt: string;
+  context?: AiContextSnapshot;
+  status: AiTurnStatus;
+  mermaid?: string;
+  errorMessage?: string;
+  modelName?: string;
+  createdAt: number;
+  completedAt?: number;
+  insertedDocumentId?: string;
+  insertedAt?: number;
+  attachments: AiAttachment[];
+}
+
+export interface AiSessionDetail extends AiSessionSummary {
+  turns: AiTurn[];
+}
+
+export interface CreateAiSessionRequest {
+  workspaceId: string;
+  sourceDocumentId?: string;
+  title?: string;
+}
+
+export interface UpdateAiSessionRequest {
+  sessionId: string;
+  title?: string;
+  draftPrompt?: string;
+}
+
+export interface GenerateAiTurnRequest {
+  sessionId: string;
+  prompt: string;
+  mode: AiTurnMode;
+  baseTurnId?: string;
+  selection?: AiSelectionContext;
+  images?: AiImageUpload[];
+}
+
+export interface RepairAiTurnRequest {
+  sessionId: string;
+  turnId: string;
+  prompt: string;
+  parseError: string;
+  selection?: AiSelectionContext;
 }
 
 export interface GenerateMermaidRequest {
@@ -250,5 +359,13 @@ export interface DesktopApi {
     testConnection(settings?: AiSettings): Promise<AiConnectionTestResult>;
     generateMermaid(request: GenerateMermaidRequest): Promise<GenerateMermaidResult>;
     repairMermaid(request: RepairMermaidRequest): Promise<GenerateMermaidResult>;
+    listSessions(workspaceId: string): Promise<AiSessionSummary[]>;
+    createSession(request: CreateAiSessionRequest): Promise<AiSessionSummary>;
+    getSession(sessionId: string): Promise<AiSessionDetail>;
+    updateSession(request: UpdateAiSessionRequest): Promise<AiSessionSummary>;
+    deleteSession(sessionId: string): Promise<void>;
+    generateTurn(request: GenerateAiTurnRequest): Promise<AiTurn>;
+    repairTurn(request: RepairAiTurnRequest): Promise<AiTurn>;
+    markTurnInserted(turnId: string, documentId: string): Promise<void>;
   };
 }

@@ -19,12 +19,12 @@ test("clicking a sidebar folder filters the workspace", async () => {
       env: { ...process.env, DRAWSPACE_E2E_WORKSPACE: workspacePath }
     });
     const page = await application.firstWindow();
-    await expect(page.getByRole("button", { name: "打开文件�?测试" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "打开文件夹：测试" })).toBeVisible();
 
-    await page.getByRole("button", { name: "打开文件�?测试" }).click();
+    await page.getByRole("button", { name: "打开文件夹：测试" }).click();
 
     await expect(page.locator(".workspace-search input")).toHaveValue("测试");
-    await expect(page.getByRole("heading", { name: "搜索“测试�? })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "搜索“测试”" })).toBeVisible();
     await expect(page.locator(".document-card").filter({ hasText: "目录画布" })).toBeVisible();
   } finally {
     await application?.evaluate(({ app }) => app.exit(0)).catch(() => undefined);

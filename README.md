@@ -15,9 +15,9 @@ DrawSpace V1 支持将自然语言交给本地 OpenAI-Compatible 模型生成 Me
 - LM Studio：`http://127.0.0.1:1234/v1`
 - Ollama OpenAI-Compatible API：`http://127.0.0.1:11434/v1`
 
-在“设置 → AI 图表”中填写服务地址和模型名称，先测试连接再保存。编辑器顶部的“AI 生成图表”按钮支持从零生成；存在选区时可勾选“参考当前选区”，只会发送选中元素的文字与箭头关系摘要，不会发送整个画布、图片、文件路径或工作区内容。生成结果会先预览，确认后以真实可编辑元素插入画布，并沿用现有自动保存与撤销机制。
+在“设置 → AI 图表”中填写服务地址和模型名称，先测试连接再保存。LM Studio 默认地址为 `http://127.0.0.1:1234/v1`，本地模型可填写 `ornith-1.0-9b`。画布右上角的 Sparkles 图标会打开工作区级 AI 面板，支持新建、切换、重命名、删除会话，草稿和每轮 Mermaid 会持久化到 SQLite。存在选区时可发送结构摘要，也可附带选区 PNG；截图支持选择、拖拽和粘贴，单张不超过 8 MB。生成结果会先预览，确认后以真实可编辑元素插入当前活动画布，并沿用现有自动保存、撤销和多标签机制。
 
-当前仅支持 Mermaid 路线，适合流程图、时序图、类图、状态图和 ER 图。9B 模型可能产生 Mermaid 语法或语义错误，解析失败时可使用一次“AI 修复”。图表过大时应缩小需求范围。若服务地址配置为远程地址，用户输入和明确选择的选区摘要可能离开本机。
+当前仅支持 Mermaid 路线，适合流程图、时序图、类图、状态图和 ER 图。9B 模型可能产生 Mermaid 语法或语义错误，解析失败时可使用一次“AI 修复”。图表过大时应缩小需求范围。若服务地址配置为远程地址，用户明确发送的输入、选区摘要或截图可能离开本机。
 
 > DrawSpace 是第三方开源项目，与 Excalidraw 官方团队不存在隶属或授权关系。
 
@@ -82,6 +82,13 @@ DrawSpace V1 支持将自然语言交给本地 OpenAI-Compatible 模型生成 Me
 SQLite 数据库、缩略图、日志和恢复快照保存在 Electron 的 `userData` 目录。在 Windows 上通常位于 `%APPDATA%/DrawSpace/`，实际路径由 `app.getPath("userData")` 决定。
 
 DrawSpace 不包含遥测，不会主动上传画布内容、文件名、路径、图片或凭证。若将工作区放在同步盘目录中，跨设备同步由对应的本地同步客户端完成。
+
+AI 会话数据库和附件位于 Electron `userData` 目录：
+
+```text
+<userData>/drawspace.db
+<userData>/ai-attachments/<workspaceId>/<sessionId>/<generated-id>.png
+```
 
 ## 常见问题
 

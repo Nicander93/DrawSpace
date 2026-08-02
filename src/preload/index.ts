@@ -104,6 +104,14 @@ const desktopApi: DesktopApi = {
     testConnection: (settings) => ipcRenderer.invoke(IPC_CHANNELS.aiTestConnection, settings),
     generateMermaid: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateMermaid, request),
     repairMermaid: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiRepairMermaid, request)
+    ,listSessions: (workspaceId) => ipcRenderer.invoke(IPC_CHANNELS.aiListSessions, workspaceId)
+    ,createSession: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiCreateSession, request)
+    ,getSession: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.aiGetSession, sessionId)
+    ,updateSession: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiUpdateSession, request)
+    ,deleteSession: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.aiDeleteSession, sessionId)
+    ,generateTurn: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateTurn, request)
+    ,repairTurn: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiRepairTurn, request)
+    ,markTurnInserted: (turnId, documentId) => ipcRenderer.invoke(IPC_CHANNELS.aiMarkTurnInserted, turnId, documentId)
   }
 };
 

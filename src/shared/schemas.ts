@@ -97,17 +97,22 @@ export const aiSettingsSchema = z.object({
       "模型地址必须使用 HTTP 或 HTTPS"
     ),
   model: z.string().trim().min(1, "模型名称不能为空").max(200),
+  visionModel: z.string().trim().min(1).max(200).optional(),
   temperature: z.number().min(0).max(2),
   timeoutMs: z.number().int().min(5_000).max(300_000)
 });
 
 export const aiSelectionNodeSchema = z.object({
-  id: z.string().min(1).max(200),
+  alias: z.string().min(1).max(20),
+  sourceElementId: z.string().min(1).max(200),
+  id: z.string().min(1).max(200).optional(),
   label: z.string().max(500),
   elementType: z.string().max(100)
 });
 
 export const aiSelectionEdgeSchema = z.object({
+  fromAlias: z.string().max(20).optional(),
+  toAlias: z.string().max(20).optional(),
   from: z.string().max(200).optional(),
   to: z.string().max(200).optional(),
   label: z.string().max(500).optional()
@@ -118,6 +123,10 @@ export const aiSelectionContextSchema = z.object({
   nodes: z.array(aiSelectionNodeSchema).max(50),
   edges: z.array(aiSelectionEdgeSchema).max(100),
   elementCount: z.number().int().min(0).max(500)
+  ,selectedElementCount: z.number().int().min(0).max(500).optional()
+  ,includedElementCount: z.number().int().min(0).max(500).optional()
+  ,truncated: z.boolean().optional()
+  ,layout: z.enum(["horizontal", "vertical", "free"]).optional()
 });
 
 export const generateMermaidRequestSchema = z.object({
@@ -131,3 +140,40 @@ export const repairMermaidRequestSchema = z.object({
   parseError: z.string().min(1).max(5_000),
   selection: aiSelectionContextSchema.optional()
 });
+
+const aiImageUploadSchema = z.object({
+  fileName: z.string().trim().min(1).max(260),
+  mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+  data: z.instanceof(ArrayBuffer).refine((value) => value.byteLength > 0 && value.byteLength <= 8 * 1024 * 1024, "单张图片不能超过 8 MB")
+});
+
+export const createAiSessionRequestSchema = z.object({
+  workspaceId: z.string().uuid(),
+  sourceDocumentId: z.string().uuid().optional(),
+  title: z.string().trim().min(1).max(120).optional()
+});
+
+export const updateAiSessionRequestSchema = z.object({
+  sessionId: z.string().uuid(),
+  title: z.string().trim().min(1).max(120).optional(),
+  draftPrompt: z.string().max(10_000).optional()
+}).refine((value) => value.title !== undefined || value.draftPrompt !== undefined, "没有可更新的内容");
+
+export const generateAiTurnRequestSchema = z.object({
+  sessionId: z.string().uuid(),
+  prompt: z.string().trim().min(1).max(10_000),
+  mode: z.enum(["create", "revise", "recreate_image", "reference_image", "extend_selection"]),
+  baseTurnId: z.string().uuid().optional(),
+  selection: aiSelectionContextSchema.optional(),
+  images: z.array(aiImageUploadSchema).max(1).optional()
+});
+
+export const repairAiTurnRequestSchema = z.object({
+  sessionId: z.string().uuid(),
+  turnId: z.string().uuid(),
+  prompt: z.string().trim().min(1).max(10_000),
+  parseError: z.string().min(1).max(5_000),
+  selection: aiSelectionContextSchema.optional()
+});
+
+export const aiSessionIdSchema = z.string().uuid();

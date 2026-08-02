@@ -4,6 +4,7 @@ import { registerRecoveryHandlers } from "./recoveryHandlers";
 import { registerWindowHandlers } from "./windowHandlers";
 import { registerWorkspaceHandlers } from "./workspaceHandlers";
 import { registerAiHandlers } from "./aiHandlers";
+import { registerAiConversationHandlers } from "./aiConversationHandlers";
 import type { IpcServices } from "./types";
 
 export type { IpcServices } from "./types";
@@ -24,4 +25,5 @@ export const registerIpcHandlers = (services: IpcServices): void => {
   });
   registerWindowHandlers();
   registerAiHandlers(handle, services.aiDiagramService);
+  registerAiConversationHandlers(handle, services.aiConversationService);
 };

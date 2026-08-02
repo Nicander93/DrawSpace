@@ -136,7 +136,12 @@ export function SettingsPage() {
                 </label>
                 <label className="field">
                   <span>模型名称</span>
-                  <input value={aiSettings.model} onChange={(event) => updateAiSetting("model", event.target.value)} placeholder="例如：qwen2.5-32b-instruct" />
+                  <input value={aiSettings.model} onChange={(event) => updateAiSetting("model", event.target.value)} placeholder="ornith-1.0-9b" />
+                </label>
+                <label className="field">
+                  <span>视觉模型（可选）</span>
+                  <input value={aiSettings.visionModel ?? ""} onChange={(event) => updateAiSetting("visionModel", event.target.value || undefined)} placeholder="默认沿用上面的模型" />
+                  <small>截图生成需要 LM Studio 中已加载支持图片的模型；不填则沿用文本模型。</small>
                 </label>
                 <details className="ai-settings-advanced">
                   <summary>高级设置</summary>
@@ -204,7 +209,7 @@ export function SettingsPage() {
           <section>
             <h2>隐私</h2>
             <div className="privacy-note">
-              AI 图表功能只会发送用户输入，以及用户明确选择的画布元素摘要。默认不会发送整个画布、图片、文件路径或工作区内容。数据是否离开本机取决于你配置的模型服务地址。
+              AI 会话历史、Mermaid 和截图附件保存在本机 userData 目录。只有用户明确发送的输入、选区摘要和截图会发送给配置的模型服务，不会发送整个画布、文件路径或工作区内容。数据是否离开本机取决于你配置的模型服务地址。
             </div>
           </section>
           </>}

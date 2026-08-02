@@ -39,4 +39,12 @@ export const IPC_CHANNELS = {
   aiTestConnection: "ai:test-connection",
   aiGenerateMermaid: "ai:generate-mermaid",
   aiRepairMermaid: "ai:repair-mermaid",
+  aiListSessions: "ai:list-sessions",
+  aiCreateSession: "ai:create-session",
+  aiGetSession: "ai:get-session",
+  aiUpdateSession: "ai:update-session",
+  aiDeleteSession: "ai:delete-session",
+  aiGenerateTurn: "ai:generate-turn",
+  aiRepairTurn: "ai:repair-turn",
+  aiMarkTurnInserted: "ai:mark-turn-inserted",
 } as const;

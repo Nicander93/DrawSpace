@@ -78,8 +78,9 @@ export class AiDiagramService {
 
   private buildPrompt(request: GenerateMermaidRequest): string {
     if (!request.selection) return `用户需求：\n${request.prompt}\n\n请生成合适的 Mermaid 图表。`;
-    const nodes = request.selection.nodes.map((node) => `- ${node.id}: ${node.label}`).join("\n") || "- 无";
-    const edges = request.selection.edges.map((edge) => `- ${edge.from ?? "?"} -> ${edge.to ?? "?"}: ${edge.label ?? ""}`).join("\n") || "- 无";
+    const aliases = new Map(request.selection.nodes.map((node) => [node.id ?? node.sourceElementId, node.alias]));
+    const nodes = request.selection.nodes.map((node) => `- ${node.alias}: ${node.label}`).join("\n") || "- 无";
+    const edges = request.selection.edges.map((edge) => `- ${edge.fromAlias ?? aliases.get(edge.from ?? "") ?? "?"} -> ${edge.toAlias ?? aliases.get(edge.to ?? "") ?? "?"}: ${edge.label ?? ""}`).join("\n") || "- 无";
     return `当前选区摘要：\n${request.selection.summary}\n\n当前选区节点：\n${nodes}\n\n当前选区关系：\n${edges}\n\n用户需求：\n${request.prompt}\n\n请只生成需要新增的图表内容，不要重复绘制当前选区已经存在的内容。`;
   }
 }

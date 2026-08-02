@@ -11,9 +11,10 @@ export interface ConvertedMermaidDiagram {
 
 export class MermaidDiagramAdapter {
   async convert(mermaid: string): Promise<ConvertedMermaidDiagram> {
-    const result = await parseMermaidToExcalidraw(mermaid, { maxEdges: 300, maxTextSize: 50_000 });
-    const elements = convertToExcalidrawElements(result.elements) as readonly ExcalidrawElement[];
-    if (!elements.length) throw new Error("Mermaid 转换结果为空");
+    const result = await parseMermaidToExcalidraw(mermaid, { maxEdges: 200, maxTextSize: 20_000 });
+    const elements = convertToExcalidrawElements(result.elements, { regenerateIds: true }) as readonly ExcalidrawElement[];
+    if (!elements.length) throw new Error("生成的图表不包含任何元素");
+    if (elements.length > 500) throw new Error("生成的图表元素过多，请缩小需求范围");
     const files = result.files ?? {};
     const svgElement = await exportToSvg({
       elements,

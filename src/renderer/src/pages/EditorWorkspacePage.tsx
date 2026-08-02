@@ -10,8 +10,10 @@ import { useWorkspaceStore } from "../stores/workspaceStore";
 import { DocumentPicker } from "../components/DocumentPicker";
 import { Modal } from "../components/Modal";
 import { UnsavedDocumentsDialog } from "../components/UnsavedDocumentsDialog";
-import { ArrowLeft, Check, Circle, FileWarning, LoaderCircle, RefreshCw, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, Circle, FileWarning, LoaderCircle, RefreshCw } from "lucide-react";
 import { useAppCloseHandler } from "../features/lifecycle/AppCloseContext";
+import { AiWorkspacePanel } from "../features/ai/AiWorkspacePanel";
+import type { AiCanvasBridge } from "../features/ai/AiCanvasBridge";
 
 interface EditorLocationState { initialContent?: DocumentContent; isDraft?: boolean }
 
@@ -20,6 +22,7 @@ export function EditorWorkspacePage({ visible = true }: { visible?: boolean }) {
   const location = useLocation();
   const navigate = useNavigate();
   const documents = useWorkspaceStore((state) => state.documents);
+  const workspace = useWorkspaceStore((state) => state.workspace);
   const refreshWorkspace = useWorkspaceStore((state) => state.refresh);
   const { tabs, activeDocumentId, openDocument, activateDocument, closeDocument, reorderTabs } = useEditorStore();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -34,12 +37,22 @@ export function EditorWorkspacePage({ visible = true }: { visible?: boolean }) {
   const [renameDraft, setRenameDraft] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
   const [renameBusy, setRenameBusy] = useState(false);
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const saveHandlersRef = useRef(new Map<string, () => Promise<boolean>>());
   const closeHandlersRef = useRef(new Map<string, () => Promise<void>>());
   const discardHandlersRef = useRef(new Map<string, () => Promise<void>>());
   const closeRequestIdRef = useRef<string | null>(null);
   const hydratedRef = useRef(false);
+  const aiBridgesRef = useRef(new Map<string, AiCanvasBridge>());
   const activeTab = tabs.find((tab) => tab.documentId === activeDocumentId) ?? null;
+  const activeAiBridge = activeDocumentId ? aiBridgesRef.current.get(activeDocumentId) : undefined;
+
+  const registerAiBridge = useCallback((id: string, bridge: AiCanvasBridge) => {
+    aiBridgesRef.current.set(id, bridge);
+    return () => {
+      if (aiBridgesRef.current.get(id) === bridge) aiBridgesRef.current.delete(id);
+    };
+  }, []);
 
   const openTab = useCallback(async (document: CanvasDocument, content?: DocumentContent, isDraft = false) => {
     openDocument({
@@ -350,25 +363,18 @@ export function EditorWorkspacePage({ visible = true }: { visible?: boolean }) {
             )}
           </div>
         )}
-        <button
-          className="button button--compact editor-workspace__ai-button"
-          type="button"
-          aria-label="AI 生成图表"
-          title="根据描述生成 Mermaid 图表，可参考当前选区"
-          onClick={() => window.dispatchEvent(new Event("drawspace:open-ai"))}
-        >
-          <Sparkles size={15} />
-          <span>AI 生成</span>
-        </button>
         <WindowControls />
       </header>
-      <div className="editor-document-host">
-        {tabs.map((tab) => (
-          <div className={`editor-document-pane ${tab.documentId === activeDocumentId ? "is-active" : ""}`} inert={tab.documentId !== activeDocumentId ? true : undefined} key={tab.documentId}>
-            <EditorPage documentId={tab.documentId} isDraft={tab.isDraft} embedded active={tab.documentId === activeDocumentId} registerSave={registerSave} registerClose={registerClose} registerDiscard={registerDiscard} onClose={() => closeDocument(tab.documentId)} />
-          </div>
-        ))}
-        {tabs.length === 0 && <div className="editor-empty"><p>还没有打开的画布</p><button className="button button--primary" type="button" onClick={() => setPickerOpen(true)}>打开画布</button></div>}
+      <div className="editor-workbench">
+        <div className="editor-document-host">
+          {tabs.map((tab) => (
+            <div className={`editor-document-pane ${tab.documentId === activeDocumentId ? "is-active" : ""}`} inert={tab.documentId !== activeDocumentId ? true : undefined} key={tab.documentId}>
+              <EditorPage documentId={tab.documentId} isDraft={tab.isDraft} embedded active={tab.documentId === activeDocumentId} registerSave={registerSave} registerClose={registerClose} registerDiscard={registerDiscard} onClose={() => closeDocument(tab.documentId)} onOpenAi={() => setAiPanelOpen(true)} aiPanelOpen={aiPanelOpen} registerAiBridge={registerAiBridge} />
+            </div>
+          ))}
+          {tabs.length === 0 && <div className="editor-empty"><p>还没有打开的画布</p><button className="button button--primary" type="button" onClick={() => setPickerOpen(true)}>打开画布</button></div>}
+        </div>
+        <AiWorkspacePanel open={aiPanelOpen} workspaceId={workspace?.id} activeDocument={activeTab ? documents.find((document) => document.id === activeTab.documentId) : null} activeBridge={activeAiBridge} onClose={() => setAiPanelOpen(false)} />
       </div>
       {pickerOpen && (
         <DocumentPicker

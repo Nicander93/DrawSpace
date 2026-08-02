@@ -4,6 +4,7 @@ import type { ThumbnailService } from "../services/ThumbnailService";
 import type { WorkspaceService } from "../services/WorkspaceService";
 import type { AppLogger } from "../services/AppLogger";
 import type { AiDiagramService } from "../services/ai/AiDiagramService";
+import type { AiConversationService } from "../services/ai/AiConversationService";
 
 /** IPC 层依赖的主进程服务集合 */
 export interface IpcServices {
@@ -12,6 +13,7 @@ export interface IpcServices {
   recoveryService: RecoveryService;
   thumbnailService: ThumbnailService;
   aiDiagramService: AiDiagramService;
+  aiConversationService: AiConversationService;
   logger?: AppLogger;
 }
 

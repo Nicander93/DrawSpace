@@ -50,7 +50,7 @@ test("Ctrl+S saves and a recent card reopens the canvas", async () => {
     expect(saveState).toEqual({
       elementCount: 1,
       statusClass: "editor-workspace__save-status editor-workspace__save-status--saved",
-      statusText: "已保�?,
+      statusText: "已保存",
       error: null
     });
 
@@ -65,7 +65,7 @@ test("Ctrl+S saves and a recent card reopens the canvas", async () => {
     await expect(recentCard.locator(".document-card__checkbox")).not.toBeChecked();
     await recentCard.dblclick({ position: { x: 80, y: 80 } });
     await expect(page.locator(".editor-canvas")).toBeVisible();
-    await expect(page.locator(".editor-workspace__save-status--saved")).toContainText("已保�?);
+    await expect(page.locator(".editor-workspace__save-status--saved")).toContainText("已保存");
 
     await page.locator(".editor-workspace__back").click();
     await expect(page.locator(".workspace-page")).toBeVisible();
@@ -83,7 +83,7 @@ test("Ctrl+S saves and a recent card reopens the canvas", async () => {
     await expect(reopenedPage.locator(".workspace-page")).toBeVisible();
     await reopenedPage.locator(".document-card").filter({ hasText: saved.document.name }).dblclick({ position: { x: 80, y: 80 } });
     await expect(reopenedPage.locator(".editor-canvas")).toBeVisible();
-    await expect(reopenedPage.locator(".editor-workspace__save-status--saved")).toContainText("已保�?);
+    await expect(reopenedPage.locator(".editor-workspace__save-status--saved")).toContainText("已保存");
 
     await reopenedPage.locator(".editor-workspace__back").click();
     await expect(reopenedPage.locator(".workspace-page")).toBeVisible();
