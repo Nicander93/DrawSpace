@@ -366,6 +366,7 @@ export interface DesktopApi {
     deleteSession(sessionId: string): Promise<void>;
     generateTurn(request: GenerateAiTurnRequest): Promise<AiTurn>;
     repairTurn(request: RepairAiTurnRequest): Promise<AiTurn>;
+    onTurnUpdated(listener: (turn: AiTurn) => void): () => void;
     markTurnInserted(turnId: string, documentId: string): Promise<void>;
   };
 }

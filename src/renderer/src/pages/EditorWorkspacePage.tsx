@@ -7,6 +7,7 @@ import { WindowControls } from "../components/WindowControls";
 import { EditorPage } from "./EditorPage";
 import { useEditorStore } from "../stores/editorStore";
 import { useWorkspaceStore } from "../stores/workspaceStore";
+import { useAiWorkspaceStore } from "../stores/aiWorkspaceStore";
 import { DocumentPicker } from "../components/DocumentPicker";
 import { Modal } from "../components/Modal";
 import { UnsavedDocumentsDialog } from "../components/UnsavedDocumentsDialog";
@@ -14,6 +15,8 @@ import { ArrowLeft, Check, Circle, FileWarning, LoaderCircle, RefreshCw } from "
 import { useAppCloseHandler } from "../features/lifecycle/AppCloseContext";
 import { AiWorkspacePanel } from "../features/ai/AiWorkspacePanel";
 import type { AiCanvasBridge } from "../features/ai/AiCanvasBridge";
+import { aiCanvasRegistry } from "../features/ai/canvas/AiCanvasRegistry";
+import { useAiCanvasBridge } from "../features/ai/canvas/useAiCanvasBridge";
 
 interface EditorLocationState { initialContent?: DocumentContent; isDraft?: boolean }
 
@@ -37,21 +40,19 @@ export function EditorWorkspacePage({ visible = true }: { visible?: boolean }) {
   const [renameDraft, setRenameDraft] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
   const [renameBusy, setRenameBusy] = useState(false);
-  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const aiPanelOpen = useAiWorkspaceStore((state) => state.panelOpen);
+  const toggleAiPanel = useAiWorkspaceStore((state) => state.togglePanel);
+  const closeAiPanel = useAiWorkspaceStore((state) => state.closePanel);
   const saveHandlersRef = useRef(new Map<string, () => Promise<boolean>>());
   const closeHandlersRef = useRef(new Map<string, () => Promise<void>>());
   const discardHandlersRef = useRef(new Map<string, () => Promise<void>>());
   const closeRequestIdRef = useRef<string | null>(null);
   const hydratedRef = useRef(false);
-  const aiBridgesRef = useRef(new Map<string, AiCanvasBridge>());
   const activeTab = tabs.find((tab) => tab.documentId === activeDocumentId) ?? null;
-  const activeAiBridge = activeDocumentId ? aiBridgesRef.current.get(activeDocumentId) : undefined;
+  const activeAiBridge = useAiCanvasBridge(activeDocumentId ?? undefined);
 
   const registerAiBridge = useCallback((id: string, bridge: AiCanvasBridge) => {
-    aiBridgesRef.current.set(id, bridge);
-    return () => {
-      if (aiBridgesRef.current.get(id) === bridge) aiBridgesRef.current.delete(id);
-    };
+    return aiCanvasRegistry.register(id, bridge);
   }, []);
 
   const openTab = useCallback(async (document: CanvasDocument, content?: DocumentContent, isDraft = false) => {
@@ -369,12 +370,12 @@ export function EditorWorkspacePage({ visible = true }: { visible?: boolean }) {
         <div className="editor-document-host">
           {tabs.map((tab) => (
             <div className={`editor-document-pane ${tab.documentId === activeDocumentId ? "is-active" : ""}`} inert={tab.documentId !== activeDocumentId ? true : undefined} key={tab.documentId}>
-              <EditorPage documentId={tab.documentId} isDraft={tab.isDraft} embedded active={tab.documentId === activeDocumentId} registerSave={registerSave} registerClose={registerClose} registerDiscard={registerDiscard} onClose={() => closeDocument(tab.documentId)} onOpenAi={() => setAiPanelOpen(true)} aiPanelOpen={aiPanelOpen} registerAiBridge={registerAiBridge} />
+              <EditorPage documentId={tab.documentId} isDraft={tab.isDraft} embedded active={tab.documentId === activeDocumentId} registerSave={registerSave} registerClose={registerClose} registerDiscard={registerDiscard} onClose={() => closeDocument(tab.documentId)} onOpenAi={toggleAiPanel} aiPanelOpen={aiPanelOpen} registerAiBridge={registerAiBridge} />
             </div>
           ))}
           {tabs.length === 0 && <div className="editor-empty"><p>还没有打开的画布</p><button className="button button--primary" type="button" onClick={() => setPickerOpen(true)}>打开画布</button></div>}
         </div>
-        <AiWorkspacePanel open={aiPanelOpen} workspaceId={workspace?.id} activeDocument={activeTab ? documents.find((document) => document.id === activeTab.documentId) : null} activeBridge={activeAiBridge} onClose={() => setAiPanelOpen(false)} />
+        <AiWorkspacePanel open={aiPanelOpen} workspaceId={workspace?.id} activeDocument={activeTab ? documents.find((document) => document.id === activeTab.documentId) : null} activeBridge={activeAiBridge} onClose={closeAiPanel} />
       </div>
       {pickerOpen && (
         <DocumentPicker

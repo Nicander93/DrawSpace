@@ -30,6 +30,7 @@ import { WindowControls } from "../components/WindowControls";
 import { UnsavedDocumentDialog } from "../components/UnsavedDocumentDialog";
 import { useWorkspaceStore } from "../stores/workspaceStore";
 import { useEditorStore } from "../stores/editorStore";
+import { useAiWorkspaceStore } from "../stores/aiWorkspaceStore";
 import { DocumentSaveCoordinator } from "../features/editor/DocumentSaveCoordinator";
 import type { SaveOutcome, SaveSnapshot } from "../features/editor/saveTypes";
 import { useTheme } from "../features/theme/ThemeContext";
@@ -74,6 +75,8 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
   const replaceEditorDocument = useEditorStore((state) => state.replaceDocumentId);
   const updateSaveStatus = useEditorStore((state) => state.updateSaveStatus);
   const updateDraftStatus = useEditorStore((state) => state.updateDraftStatus);
+  const updateCanvasSnapshot = useAiWorkspaceStore((state) => state.updateCanvasSnapshot);
+  const removeCanvasSnapshot = useAiWorkspaceStore((state) => state.removeCanvasSnapshot);
   const { theme } = useTheme();
   const locationState = location.state as EditorLocationState | null;
   const initialContent =
@@ -87,6 +90,7 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
   const [document, setDocument] = useState<CanvasDocument | null>(
     documentContent?.document ?? null
   );
+  const currentDocumentId = document?.id;
   const [saveStatus, setSaveStatus] = useState<SaveStatus>(initialIsDraft ? "dirty" : "saved");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -465,6 +469,11 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
     if (document) updateSaveStatus(document.id, saveStatus, saveError);
   }, [document, saveError, saveStatus, updateSaveStatus]);
 
+  useEffect(() => {
+    if (!currentDocumentId) return;
+    return () => removeCanvasSnapshot(currentDocumentId);
+  }, [currentDocumentId, removeCanvasSnapshot]);
+
   useEffect(
     () => () => {
       if (dirtyRef.current) {
@@ -482,6 +491,14 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
     files: BinaryFiles
   ): void => {
     if (!documentContent) return;
+    const snapshotDocumentId = document?.id ?? documentId;
+    if (!snapshotDocumentId) return;
+    const selectedElementCount = Object.keys(appState.selectedElementIds ?? {}).length;
+    updateCanvasSnapshot(snapshotDocumentId, {
+      documentId: snapshotDocumentId,
+      selectedElementCount,
+      hasSelection: selectedElementCount > 0
+    });
     const scene = { elements, appState, files };
     const serializedScene = adapter.serializeScene(scene);
     sceneRuntimeRef.current = scene;

@@ -132,7 +132,7 @@ export function SettingsPage() {
                 <label className="field">
                   <span>模型服务地址</span>
                   <input value={aiSettings.baseUrl} onChange={(event) => updateAiSetting("baseUrl", event.target.value)} placeholder="http://127.0.0.1:1234/v1" />
-                  <small>LM Studio：127.0.0.1:1234/v1 · Ollama：127.0.0.1:11434/v1</small>
+                  <small>支持本地服务和兼容 OpenAI API 的远程服务，例如 http://127.0.0.1:1234/v1。</small>
                 </label>
                 <label className="field">
                   <span>模型名称</span>
@@ -141,7 +141,7 @@ export function SettingsPage() {
                 <label className="field">
                   <span>视觉模型（可选）</span>
                   <input value={aiSettings.visionModel ?? ""} onChange={(event) => updateAiSetting("visionModel", event.target.value || undefined)} placeholder="默认沿用上面的模型" />
-                  <small>截图生成需要 LM Studio 中已加载支持图片的模型；不填则沿用文本模型。</small>
+                  <small>截图生成需要服务端已加载支持图片输入的模型；不填则沿用文本模型。</small>
                 </label>
                 <details className="ai-settings-advanced">
                   <summary>高级设置</summary>

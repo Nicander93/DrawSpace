@@ -111,6 +111,11 @@ const desktopApi: DesktopApi = {
     ,deleteSession: (sessionId) => ipcRenderer.invoke(IPC_CHANNELS.aiDeleteSession, sessionId)
     ,generateTurn: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiGenerateTurn, request)
     ,repairTurn: (request) => ipcRenderer.invoke(IPC_CHANNELS.aiRepairTurn, request)
+    ,onTurnUpdated: (listener) => {
+      const handler = (_event: Electron.IpcRendererEvent, turn: Parameters<typeof listener>[0]): void => listener(turn);
+      ipcRenderer.on(IPC_CHANNELS.aiTurnUpdated, handler);
+      return () => ipcRenderer.removeListener(IPC_CHANNELS.aiTurnUpdated, handler);
+    }
     ,markTurnInserted: (turnId, documentId) => ipcRenderer.invoke(IPC_CHANNELS.aiMarkTurnInserted, turnId, documentId)
   }
 };

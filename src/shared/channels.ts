@@ -46,5 +46,6 @@ export const IPC_CHANNELS = {
   aiDeleteSession: "ai:delete-session",
   aiGenerateTurn: "ai:generate-turn",
   aiRepairTurn: "ai:repair-turn",
+  aiTurnUpdated: "ai:turn-updated",
   aiMarkTurnInserted: "ai:mark-turn-inserted",
 } as const;

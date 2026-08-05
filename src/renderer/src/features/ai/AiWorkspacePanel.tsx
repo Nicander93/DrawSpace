@@ -1,10 +1,16 @@
-import { AlertCircle, Check, Code2, FileImage, LoaderCircle, MoreHorizontal, Plus, RefreshCw, Send, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import type { AiImageUpload, AiSessionDetail, AiSessionSummary, AiTurn, CanvasDocument } from "@shared/types";
+import { AlertCircle, Sparkles, X } from "lucide-react";
+import { useEffect, useReducer, useRef, useState } from "react";
+import type { AiImageUpload, AiSessionDetail, AiSessionSummary, CanvasDocument } from "@shared/types";
 import type { AiCanvasBridge } from "./AiCanvasBridge";
-import { MermaidDiagramAdapter, type ConvertedMermaidDiagram } from "./MermaidDiagramAdapter";
+import { useAiWorkspaceStore } from "../../stores/aiWorkspaceStore";
+import { Modal } from "../../components/Modal";
+import { AiComposer } from "./components/AiComposer";
+import { AiSessionSidebar } from "./components/AiSessionSidebar";
+import { AiTurnMessage } from "./components/AiTurnMessage";
+import { aiComposerReducer, initialAiComposerState } from "./model/composerReducer";
+import type { PendingImage } from "./model/composerReducer";
+import "./ai-workspace.css";
 
-interface PendingImage extends AiImageUpload { previewUrl: string; }
 interface AiWorkspacePanelProps {
   open: boolean;
   workspaceId?: string;
@@ -13,162 +19,363 @@ interface AiWorkspacePanelProps {
   onClose: () => void;
 }
 
-const adapter = new MermaidDiagramAdapter();
-const getError = (error: unknown, fallback: string): string => error instanceof Error ? error.message : fallback;
+const getError = (error: unknown, fallback: string): string =>
+  error instanceof Error ? error.message : fallback;
 
-function AiTurnCard({ turn, activeBridge, activeDocumentId, onBase, onRepair, onRefresh }: { turn: AiTurn; activeBridge?: AiCanvasBridge; activeDocumentId?: string; onBase: () => void; onRepair: (parseError: string) => void; onRefresh: () => Promise<void> }) {
-  const [diagram, setDiagram] = useState<ConvertedMermaidDiagram | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [showSource, setShowSource] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let disposed = false;
-    if (turn.status !== "ready" || !turn.mermaid) { setDiagram(null); setError(null); return; }
-    void adapter.convert(turn.mermaid).then((result) => { if (!disposed) { setDiagram(result); setError(null); } }).catch((reason: unknown) => { if (!disposed) setError(getError(reason, "Mermaid 预览转换失败")); });
-    return () => { disposed = true; };
-  }, [turn.mermaid, turn.status]);
-  useEffect(() => {
-    if (!diagram?.svg) { setPreviewUrl(null); return; }
-    const url = URL.createObjectURL(new Blob([diagram.svg], { type: "image/svg+xml" }));
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [diagram]);
-  const insert = async (): Promise<void> => {
-    if (!diagram || !activeBridge || !activeDocumentId) return;
-    try { activeBridge.insertDiagram(diagram); await window.desktopApi.ai.markTurnInserted(turn.id, activeDocumentId); await onRefresh(); setError(null); }
-    catch (reason) { setError(getError(reason, "图表插入失败，当前画布未被修改")); }
-  };
-  return (
-    <article className="ai-turn-card">
-      <div className="ai-turn-card__header"><span className="ai-turn-card__prompt">{turn.prompt}</span><span className={`ai-turn-status ai-turn-status--${turn.status}`}>{turn.status === "generating" ? "生成中" : turn.status === "ready" ? "已完成" : turn.status === "error" ? "失败" : "已取消"}</span></div>
-      {turn.context?.selection && <span className="ai-context-chip">选区 {turn.context.selection.selectedElementCount ?? turn.context.selection.elementCount} 个元素</span>}
-      {turn.attachments.length > 0 && <span className="ai-context-chip"><FileImage size={12} />截图 {turn.attachments.length} 张</span>}
-      {turn.status === "generating" && <div className="ai-turn-card__loading"><LoaderCircle className="is-spinning" size={17} />正在请求 LM Studio…</div>}
-      {(turn.status === "error" || error) && <div className="ai-panel-error"><AlertCircle size={15} /><span>{error ?? turn.errorMessage ?? "生成失败"}</span>{turn.mermaid && <button className="button button--compact" type="button" onClick={() => onRepair(error ?? turn.errorMessage ?? "Mermaid 转换失败")}><RefreshCw size={14} />AI 修复</button>}</div>}
-      {previewUrl && <img className="ai-turn-card__preview" src={previewUrl} alt="Mermaid 图表预览" />}
-      {error && <div className="ai-panel-error"><AlertCircle size={15} />{error}</div>}
-      {showSource && turn.mermaid && <pre className="ai-turn-card__source">{turn.mermaid}</pre>}
-      {turn.status === "ready" && <div className="ai-turn-card__actions">
-        <button className="button button--compact" type="button" onClick={() => setShowSource((value) => !value)}><Code2 size={14} />{showSource ? "隐藏 Mermaid" : "查看 Mermaid"}</button>
-        <button className="button button--compact" type="button" onClick={onBase}>基于此修改</button>
-        <button className="button button--primary button--compact" type="button" disabled={!diagram || !activeBridge || !activeDocumentId} onClick={() => void insert()}>插入当前画布</button>
-        {turn.insertedDocumentId && <span className="ai-inserted-mark"><Check size={13} />已插入</span>}
-      </div>}
-    </article>
-  );
-}
-
-export function AiWorkspacePanel({ open, workspaceId, activeDocument, activeBridge, onClose }: AiWorkspacePanelProps) {
+export function AiWorkspacePanel({
+  open,
+  workspaceId,
+  activeDocument,
+  activeBridge,
+  onClose
+}: AiWorkspacePanelProps) {
   const [sessions, setSessions] = useState<AiSessionSummary[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | undefined>();
+  const activeSessionId = useAiWorkspaceStore((state) =>
+    workspaceId ? state.activeSessionIdByWorkspace[workspaceId] : undefined
+  );
+  const setActiveSession = useAiWorkspaceStore((state) => state.setActiveSession);
+  const selectionSnapshot = useAiWorkspaceStore((state) =>
+    activeDocument?.id ? state.canvasSnapshots[activeDocument.id] : undefined
+  );
   const [detail, setDetail] = useState<AiSessionDetail | null>(null);
-  const [draft, setDraft] = useState("");
-  const [selectedBaseTurnId, setSelectedBaseTurnId] = useState<string | undefined>();
-  const [pendingSelection, setPendingSelection] = useState(false);
-  const [pendingSelectionImage, setPendingSelectionImage] = useState(false);
-  const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [composer, dispatchComposer] = useReducer(aiComposerReducer, initialAiComposerState);
+  const { draft, submitting: busy, context } = composer;
+  const { baseTurnId: selectedBaseTurnId, useSelection: pendingSelection, includeSelectionAppearance: pendingSelectionImage, images: pendingImages } = context;
   const [panelError, setPanelError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [deletingSession, setDeletingSession] = useState<AiSessionSummary | null>(null);
   const draftTimerRef = useRef<number | undefined>(undefined);
 
   const refreshSessions = async (): Promise<void> => {
     if (!workspaceId) return;
     const next = await window.desktopApi.ai.listSessions(workspaceId);
     setSessions(next);
-    const persisted = localStorage.getItem(`drawspace.ai.active.${workspaceId}`);
+    const persisted = useAiWorkspaceStore.getState().activeSessionIdByWorkspace[workspaceId];
     const selected = next.find((session) => session.id === persisted)?.id ?? next[0]?.id;
-    if (selected && selected !== activeSessionId) setActiveSessionId(selected);
+    if (selected && selected !== activeSessionId) {
+      setActiveSession(workspaceId, selected);
+    }
     if (!selected) {
-      const created = await window.desktopApi.ai.createSession({ workspaceId, sourceDocumentId: activeDocument?.id });
-      setSessions([created]); setActiveSessionId(created.id);
+      const created = await window.desktopApi.ai.createSession({
+        workspaceId,
+        sourceDocumentId: activeDocument?.id
+      });
+      setSessions([created]);
+      setActiveSession(workspaceId, created.id);
     }
   };
+
   const refreshDetail = async (sessionId = activeSessionId): Promise<void> => {
     if (!sessionId) return;
     const next = await window.desktopApi.ai.getSession(sessionId);
-    setDetail(next); setDraft(next.draftPrompt);
+    setDetail(next);
+    dispatchComposer({ type: "reset-after-send" });
+    dispatchComposer({ type: "set-draft", value: next.draftPrompt });
   };
+
   useEffect(() => {
     if (!open || !workspaceId) return;
-    void refreshSessions().catch((reason) => setPanelError(getError(reason, "无法读取 AI 对话")));
+    void refreshSessions().catch((reason) =>
+      setPanelError(getError(reason, "无法读取 AI 对话"))
+    );
+    // refreshSessions 依赖当前工作区和活动会话，切换时重新加载。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workspaceId]);
+
   useEffect(() => {
     if (!activeSessionId || !workspaceId) return;
-    localStorage.setItem(`drawspace.ai.active.${workspaceId}`, activeSessionId);
-    void refreshDetail().catch((reason) => setPanelError(getError(reason, "无法读取当前对话")));
+    void refreshDetail().catch((reason) =>
+      setPanelError(getError(reason, "无法读取当前对话"))
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, workspaceId]);
-  useEffect(() => () => { if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current); pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl)); }, [pendingImages]);
+
+  useEffect(
+    () =>
+      window.desktopApi.ai.onTurnUpdated((turn) => {
+        if (turn.sessionId !== activeSessionId) return;
+        setDetail((current) => {
+          if (!current) return current;
+          const exists = current.turns.some((item) => item.id === turn.id);
+          return {
+            ...current,
+            turns: exists
+              ? current.turns.map((item) => (item.id === turn.id ? turn : item))
+              : [...current.turns, turn]
+          };
+        });
+        if (workspaceId) {
+          void window.desktopApi.ai.listSessions(workspaceId).then(setSessions).catch(() => undefined);
+        }
+      }),
+    [activeSessionId, workspaceId]
+  );
+
+  useEffect(
+    () => () => {
+      if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current);
+      context.images.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+    },
+    [context.images]
+  );
+
   const updateDraft = (value: string): void => {
-    setDraft(value);
+    dispatchComposer({ type: "set-draft", value });
     if (!activeSessionId) return;
     if (draftTimerRef.current) window.clearTimeout(draftTimerRef.current);
-    draftTimerRef.current = window.setTimeout(() => { void window.desktopApi.ai.updateSession({ sessionId: activeSessionId, draftPrompt: value }).catch(() => undefined); }, 350);
+    draftTimerRef.current = window.setTimeout(() => {
+      void window.desktopApi.ai
+        .updateSession({ sessionId: activeSessionId, draftPrompt: value })
+        .catch(() => undefined);
+    }, 350);
   };
+
   const createSession = async (): Promise<void> => {
     if (!workspaceId) return;
-    try { const created = await window.desktopApi.ai.createSession({ workspaceId, sourceDocumentId: activeDocument?.id }); setSessions((items) => [created, ...items]); setActiveSessionId(created.id); setPanelError(null); }
-    catch (reason) { setPanelError(getError(reason, "新建对话失败")); }
+    try {
+      const created = await window.desktopApi.ai.createSession({
+        workspaceId,
+        sourceDocumentId: activeDocument?.id
+      });
+      setSessions((items) => [created, ...items]);
+      setActiveSession(workspaceId, created.id);
+      setPanelError(null);
+    } catch (reason) {
+      setPanelError(getError(reason, "新建对话失败"));
+    }
   };
+
   const renameSession = async (session: AiSessionSummary): Promise<void> => {
-    const title = window.prompt("重命名对话", session.title)?.trim();
-    if (!title || title === session.title) return;
-    try { const updated = await window.desktopApi.ai.updateSession({ sessionId: session.id, title }); setSessions((items) => items.map((item) => item.id === updated.id ? updated : item)); if (detail?.id === updated.id) setDetail((current) => current ? { ...current, ...updated } : current); }
-    catch (reason) { setPanelError(getError(reason, "重命名失败")); }
+    const title = renameDraft.trim();
+    if (!title || title === session.title) {
+      setRenamingSessionId(null);
+      return;
+    }
+    try {
+      const updated = await window.desktopApi.ai.updateSession({
+        sessionId: session.id,
+        title
+      });
+      setSessions((items) =>
+        items.map((item) => (item.id === updated.id ? updated : item))
+      );
+      if (detail?.id === updated.id) {
+        setDetail((current) => (current ? { ...current, ...updated } : current));
+      }
+    } catch (reason) {
+      setPanelError(getError(reason, "重命名失败"));
+    } finally {
+      setRenamingSessionId(null);
+    }
   };
+
   const deleteSession = async (session: AiSessionSummary): Promise<void> => {
-    if (!window.confirm(`确定删除“${session.title}”吗？`)) return;
-    try { await window.desktopApi.ai.deleteSession(session.id); const remaining = sessions.filter((item) => item.id !== session.id); setSessions(remaining); setActiveSessionId(remaining[0]?.id); setDetail(null); }
-    catch (reason) { setPanelError(getError(reason, "删除对话失败")); }
+    try {
+      await window.desktopApi.ai.deleteSession(session.id);
+      const remaining = sessions.filter((item) => item.id !== session.id);
+      setSessions(remaining);
+      if (workspaceId && activeSessionId === session.id) {
+        setActiveSession(workspaceId, remaining[0]?.id);
+        setDetail(null);
+      }
+    } catch (reason) {
+      setPanelError(getError(reason, "删除对话失败"));
+    } finally {
+      setDeletingSession(null);
+    }
   };
+
   const addFiles = async (files: FileList | File[]): Promise<void> => {
     const file = Array.from(files)[0];
     if (!file) return;
-    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) { setPanelError("只支持 PNG、JPEG 或 WEBP 图片"); return; }
-    if (file.size > 8 * 1024 * 1024) { setPanelError("单张图片不能超过 8 MB"); return; }
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setPanelError("只支持 PNG、JPEG 或 WEBP 图片");
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setPanelError("单张图片不能超过 8 MB");
+      return;
+    }
     const data = await file.arrayBuffer();
     const previewUrl = URL.createObjectURL(file);
-    setPendingImages((items) => { items.forEach((item) => URL.revokeObjectURL(item.previewUrl)); return [{ fileName: file.name || "image", mimeType: file.type as PendingImage["mimeType"], data, previewUrl }]; });
+    context.images.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+    dispatchComposer({
+      type: "add-image",
+      image: {
+        fileName: file.name || "image",
+        mimeType: file.type as PendingImage["mimeType"],
+        data,
+        previewUrl
+      }
+    });
     setPanelError(null);
   };
+
+  const removeImage = (image: PendingImage): void => {
+    URL.revokeObjectURL(image.previewUrl);
+    dispatchComposer({ type: "remove-image", image });
+  };
+
   const send = async (): Promise<void> => {
     const prompt = draft.trim();
     if (!activeSessionId || !prompt || busy) return;
     const selection = pendingSelection ? activeBridge?.getSelectionContext() : undefined;
-    if (pendingSelection && !selection) { setPanelError("当前没有可参考的选区"); return; }
-    setBusy(true); setPanelError(null);
+    if (pendingSelection && !selection) {
+      setPanelError("当前没有可参考的选区");
+      return;
+    }
+    dispatchComposer({ type: "set-submitting", value: true });
+    setPanelError(null);
     try {
       let selectionImage: AiImageUpload | undefined;
       if (pendingSelectionImage && activeBridge?.exportSelectionPreview) {
-        try { selectionImage = await activeBridge.exportSelectionPreview(); }
-        catch { setPanelError("选区图片导出失败，将仅发送结构摘要"); }
+        try {
+          selectionImage = await activeBridge.exportSelectionPreview();
+        } catch {
+          setPanelError("选区图片导出失败，将仅发送结构摘要");
+        }
       }
-      const images = pendingImages.length ? pendingImages.map((image) => ({ fileName: image.fileName, mimeType: image.mimeType, data: image.data })) : selectionImage ? [selectionImage] : undefined;
-      const mode = selectedBaseTurnId ? "revise" : images ? "reference_image" : pendingSelection ? "extend_selection" : "create";
-      await window.desktopApi.ai.generateTurn({ sessionId: activeSessionId, prompt, mode, baseTurnId: selectedBaseTurnId, selection, images });
-      setDraft(""); setSelectedBaseTurnId(undefined); setPendingSelection(false); setPendingSelectionImage(false); pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl)); setPendingImages([]);
-      await refreshSessions(); await refreshDetail(activeSessionId);
-    } catch (reason) { setPanelError(getError(reason, "AI 图表生成失败")); await refreshDetail(activeSessionId).catch(() => undefined); }
-    finally { setBusy(false); }
+      const images = pendingImages.length
+        ? pendingImages.map((image) => ({
+            fileName: image.fileName,
+            mimeType: image.mimeType,
+            data: image.data
+          }))
+        : selectionImage
+          ? [selectionImage]
+          : undefined;
+      const mode = selectedBaseTurnId
+        ? "revise"
+        : images
+          ? "reference_image"
+          : pendingSelection
+            ? "extend_selection"
+            : "create";
+      await window.desktopApi.ai.generateTurn({
+        sessionId: activeSessionId,
+        prompt,
+        mode,
+        baseTurnId: selectedBaseTurnId,
+        selection,
+        images
+      });
+      dispatchComposer({ type: "reset-after-send" });
+      pendingImages.forEach((image) => URL.revokeObjectURL(image.previewUrl));
+      await refreshSessions();
+      await refreshDetail(activeSessionId);
+    } catch (reason) {
+      setPanelError(getError(reason, "AI 图表生成失败"));
+      await refreshDetail(activeSessionId).catch(() => undefined);
+    } finally {
+      dispatchComposer({ type: "set-submitting", value: false });
+    }
   };
-  const repair = async (turn: AiTurn, parseError = turn.errorMessage): Promise<void> => {
+
+  const repair = async (turnId: string, prompt: string, parseError?: string): Promise<void> => {
     if (!activeSessionId || !parseError || busy) return;
-    setBusy(true); setPanelError(null);
-    try { await window.desktopApi.ai.repairTurn({ sessionId: activeSessionId, turnId: turn.id, prompt: turn.prompt, parseError }); await refreshSessions(); await refreshDetail(activeSessionId); }
-    catch (reason) { setPanelError(getError(reason, "AI 修复失败")); }
-    finally { setBusy(false); }
+    dispatchComposer({ type: "set-submitting", value: true });
+    setPanelError(null);
+    try {
+      await window.desktopApi.ai.repairTurn({
+        sessionId: activeSessionId,
+        turnId,
+        prompt,
+        parseError
+      });
+      await refreshSessions();
+      await refreshDetail(activeSessionId);
+    } catch (reason) {
+      setPanelError(getError(reason, "AI 修复失败"));
+    } finally {
+      dispatchComposer({ type: "set-submitting", value: false });
+    }
   };
-  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>): void => { const file = Array.from(event.clipboardData.files)[0]; if (file) { event.preventDefault(); void addFiles([file]); } };
-  const selectionAvailable = Boolean(activeBridge?.getSelectionContext());
+
+  const isGenerating = Boolean(detail?.turns.some((turn) => turn.status === "generating"));
+  const selectionAvailable = Boolean(selectionSnapshot?.hasSelection);
+
   return (
     <aside className={`ai-workspace-panel ${open ? "is-open" : "is-closed"}`} aria-hidden={!open}>
-      <header className="ai-workspace-panel__header"><div><strong>AI 图表助手</strong><span>工作区级会话 · LM Studio</span></div><button className="editor-icon-button" type="button" aria-label="关闭 AI 面板" onClick={onClose}><X size={18} /></button></header>
+      <header className="ai-workspace-panel__header">
+        <div className="ai-workspace-panel__identity">
+          <span className="ai-workspace-panel__mark"><Sparkles size={17} /></span>
+          <div><strong>AI 图表助手</strong><span>工作区会话 · 多模态生成</span></div>
+        </div>
+        <button className="editor-icon-button" type="button" aria-label="关闭 AI 面板" onClick={onClose}><X size={18} /></button>
+      </header>
       <div className="ai-workspace-panel__body">
-        <nav className="ai-conversation-sidebar" aria-label="AI 对话列表"><button className="button button--primary button--compact ai-new-session" type="button" onClick={() => void createSession()}><Plus size={15} />新建对话</button><div className="ai-session-list">{sessions.map((session) => <div className={`ai-session-item ${session.id === activeSessionId ? "is-active" : ""}`} key={session.id}><button type="button" onClick={() => setActiveSessionId(session.id)}><strong>{session.title}</strong><small>{session.latestPrompt ?? "尚未发送消息"}</small><small>{session.sourceDocumentName ? `来源：${session.sourceDocumentName}` : "工作区会话"}</small></button><div className="ai-session-item__actions"><button type="button" aria-label="重命名" onClick={() => void renameSession(session)}><MoreHorizontal size={14} /></button><button type="button" aria-label="删除" onClick={() => void deleteSession(session)}><Trash2 size={13} /></button></div></div>)}</div></nav>
-        <section className="ai-conversation-view"><div className="ai-conversation-view__meta"><span>{detail?.title ?? "新对话"}</span>{activeDocument && <small>当前插入目标：{activeDocument.name}</small>}</div><div className="ai-turn-list">{detail?.turns.length ? detail.turns.map((turn) => <AiTurnCard key={turn.id} turn={turn} activeBridge={activeBridge} activeDocumentId={activeDocument?.id} onBase={() => { setSelectedBaseTurnId(turn.id); updateDraft(draft); }} onRepair={(parseError) => void repair(turn, parseError)} onRefresh={() => refreshDetail()} />) : <div className="ai-empty-state"><FileImage size={22} /><p>描述你想生成的图表，或附加一张截图。</p><small>历史 Mermaid 会保存在当前工作区。</small></div>}</div><div className="ai-composer" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void addFiles(event.dataTransfer.files); }}><div className="ai-composer__chips">{selectedBaseTurnId && <button type="button" className="ai-context-chip" onClick={() => setSelectedBaseTurnId(undefined)}>基于历史结果修改 <X size={12} /></button>}{pendingSelection && <button type="button" className="ai-context-chip" onClick={() => { setPendingSelection(false); setPendingSelectionImage(false); }}>参考当前选区 <X size={12} /></button>}{pendingSelectionImage && <span className="ai-context-chip">选区外观</span>}{pendingImages.map((image) => <button type="button" className="ai-context-chip" key={image.previewUrl} onClick={() => { URL.revokeObjectURL(image.previewUrl); setPendingImages([]); }}>{image.fileName}<X size={12} /></button>)}</div><textarea value={draft} onChange={(event) => updateDraft(event.target.value)} onPaste={handlePaste} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); void send(); } }} placeholder="描述要生成或修改的内容…" disabled={busy || !detail} /><div className="ai-composer__footer"><input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => { if (event.target.files) void addFiles(event.target.files); event.target.value = ""; }} /><button className="button button--compact" type="button" onClick={() => fileInputRef.current?.click()} disabled={busy}><FileImage size={15} />添加截图</button><button className={`button button--compact ${pendingSelection ? "is-active" : ""}`} type="button" disabled={!selectionAvailable || busy} onClick={() => { const next = !pendingSelection; setPendingSelection(next); if (!next) setPendingSelectionImage(false); }}>参考选区</button>{pendingSelection && <button className={`button button--compact ${pendingSelectionImage ? "is-active" : ""}`} type="button" disabled={busy} onClick={() => setPendingSelectionImage((value) => !value)}>同时参考选区外观</button>}<button className="button button--primary button--compact" type="button" disabled={busy || !draft.trim() || !detail} onClick={() => void send()}><Send size={15} />发送</button></div></div>{panelError && <div className="ai-panel-error ai-panel-error--global"><AlertCircle size={15} /><span>{panelError}</span><button type="button" onClick={() => setPanelError(null)}><X size={14} /></button></div>}</section>
+        <AiSessionSidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          renamingSessionId={renamingSessionId}
+          renameDraft={renameDraft}
+          onNew={() => void createSession()}
+          onSelect={(sessionId) => { if (workspaceId) setActiveSession(workspaceId, sessionId); }}
+          onStartRename={(session) => { setRenamingSessionId(session.id); setRenameDraft(session.title); }}
+          onRenameDraftChange={setRenameDraft}
+          onRename={(session) => void renameSession(session)}
+          onCancelRename={() => setRenamingSessionId(null)}
+          onDelete={setDeletingSession}
+        />
+        <section className="ai-conversation-view">
+          <div className="ai-conversation-view__meta">
+            <span>{detail?.title ?? "新对话"}</span>
+            {activeDocument && <small>当前插入目标：{activeDocument.name}</small>}
+          </div>
+          <div className="ai-turn-list">
+            {detail?.turns.length ? detail.turns.map((turn) => (
+              <AiTurnMessage
+                key={turn.id}
+                turn={turn}
+                activeBridge={activeBridge}
+                activeDocumentId={activeDocument?.id}
+                onBase={() => dispatchComposer({ type: "use-base-turn", turnId: turn.id })}
+                onRepair={(parseError) => void repair(turn.id, turn.prompt, parseError)}
+                onRefresh={() => refreshDetail()}
+              />
+            )) : (
+              <div className="ai-empty-state">
+                <FileImagePlaceholder />
+                <p>描述你想生成的图表，或附加一张截图。</p>
+                <small>生成记录会保存在当前工作区。</small>
+              </div>
+            )}
+          </div>
+          <AiComposer
+            draft={draft}
+            busy={busy || isGenerating}
+            hasDetail={Boolean(detail)}
+            selectionAvailable={selectionAvailable}
+            pendingSelection={pendingSelection}
+            pendingSelectionImage={pendingSelectionImage}
+            selectedBaseTurnId={selectedBaseTurnId}
+            pendingImages={pendingImages}
+            onDraftChange={updateDraft}
+            onSend={() => void send()}
+            onAddFiles={(files) => void addFiles(files)}
+            onToggleSelection={() => dispatchComposer({ type: "use-selection", enabled: !pendingSelection })}
+            onToggleSelectionImage={() => dispatchComposer({ type: "include-selection-appearance", enabled: !pendingSelectionImage })}
+            onClearBase={() => dispatchComposer({ type: "use-base-turn" })}
+            onClearSelection={() => dispatchComposer({ type: "use-selection", enabled: false })}
+            onRemoveImage={removeImage}
+          />
+          {panelError && <div className="ai-panel-error ai-panel-error--global"><AlertCircle size={15} /><span>{panelError}</span><button type="button" onClick={() => setPanelError(null)}><X size={14} /></button></div>}
+        </section>
       </div>
+      {deletingSession && (
+        <Modal
+          title="删除对话"
+          onClose={() => setDeletingSession(null)}
+          footer={<><button className="button" type="button" onClick={() => setDeletingSession(null)}>取消</button><button className="button button--danger" type="button" onClick={() => void deleteSession(deletingSession)}>删除</button></>}
+        >
+          <p className="ai-confirm-copy">确定删除“{deletingSession.title}”及其中的生成记录吗？</p>
+        </Modal>
+      )}
     </aside>
   );
+}
+
+function FileImagePlaceholder() {
+  return <span className="ai-empty-state__icon" aria-hidden="true">✦</span>;
 }

@@ -239,6 +239,11 @@ const initializeApplication = async (): Promise<void> => {
     new AiPromptBuilder(),
     logger
   );
+  aiConversationService.onTurnUpdated((turn) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(IPC_CHANNELS.aiTurnUpdated, turn);
+    }
+  });
 
   await Promise.all([
     workspaceService.initialize(),
