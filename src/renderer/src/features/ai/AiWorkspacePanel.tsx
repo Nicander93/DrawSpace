@@ -1,11 +1,12 @@
-import { AlertCircle, Sparkles, X } from "lucide-react";
+import { AlertCircle, History, Plus, Settings2, Sparkles, Star, X } from "lucide-react";
 import { useEffect, useReducer, useRef, useState } from "react";
 import type { AiImageUpload, AiSessionDetail, AiSessionSummary, CanvasDocument } from "@shared/types";
 import type { AiCanvasBridge } from "./AiCanvasBridge";
 import { useAiWorkspaceStore } from "../../stores/aiWorkspaceStore";
 import { Modal } from "../../components/Modal";
-import { AiComposer } from "./components/AiComposer";
+import { AiComposer, type AiComposerHandle } from "./components/AiComposer";
 import { AiSessionSidebar } from "./components/AiSessionSidebar";
+import { AiSettingsPanel } from "./components/AiSettingsPanel";
 import { AiTurnMessage } from "./components/AiTurnMessage";
 import { aiComposerReducer, initialAiComposerState } from "./model/composerReducer";
 import type { PendingImage } from "./model/composerReducer";
@@ -18,6 +19,12 @@ interface AiWorkspacePanelProps {
   activeBridge?: AiCanvasBridge;
   onClose: () => void;
 }
+
+const SUGGESTIONS = [
+  "生成一张用户登录流程图",
+  "解释当前图表的核心逻辑",
+  "优化现有图表的结构和布局"
+] as const;
 
 const getError = (error: unknown, fallback: string): string =>
   error instanceof Error ? error.message : fallback;
@@ -37,15 +44,26 @@ export function AiWorkspacePanel({
   const selectionSnapshot = useAiWorkspaceStore((state) =>
     activeDocument?.id ? state.canvasSnapshots[activeDocument.id] : undefined
   );
+  const panelView = useAiWorkspaceStore((state) => state.panelView);
+  const setPanelView = useAiWorkspaceStore((state) => state.setPanelView);
+  const consumePendingIntent = useAiWorkspaceStore((state) => state.consumePendingIntent);
+  const pendingIntent = useAiWorkspaceStore((state) => state.pendingIntent);
   const [detail, setDetail] = useState<AiSessionDetail | null>(null);
   const [composer, dispatchComposer] = useReducer(aiComposerReducer, initialAiComposerState);
   const { draft, submitting: busy, context } = composer;
-  const { baseTurnId: selectedBaseTurnId, useSelection: pendingSelection, includeSelectionAppearance: pendingSelectionImage, images: pendingImages } = context;
+  const {
+    baseTurnId: selectedBaseTurnId,
+    useSelection: pendingSelection,
+    includeSelectionAppearance: pendingSelectionImage,
+    images: pendingImages
+  } = context;
   const [panelError, setPanelError] = useState<string | null>(null);
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [deletingSession, setDeletingSession] = useState<AiSessionSummary | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(true);
   const draftTimerRef = useRef<number | undefined>(undefined);
+  const composerRef = useRef<AiComposerHandle>(null);
 
   const refreshSessions = async (): Promise<void> => {
     if (!workspaceId) return;
@@ -79,7 +97,6 @@ export function AiWorkspacePanel({
     void refreshSessions().catch((reason) =>
       setPanelError(getError(reason, "无法读取 AI 对话"))
     );
-    // refreshSessions 依赖当前工作区和活动会话，切换时重新加载。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workspaceId]);
 
@@ -119,6 +136,26 @@ export function AiWorkspacePanel({
     },
     [context.images]
   );
+
+  useEffect(() => {
+    if (!open || !pendingIntent) return;
+    const intent = consumePendingIntent();
+    if (intent === "upload") {
+      window.setTimeout(() => composerRef.current?.openFilePicker(), 0);
+    } else if (intent === "explain-selection") {
+      dispatchComposer({ type: "use-selection", enabled: true });
+      dispatchComposer({ type: "set-draft", value: "请解释当前选中图表的内容与逻辑" });
+      if (activeSessionId) {
+        void window.desktopApi.ai
+          .updateSession({
+            sessionId: activeSessionId,
+            draftPrompt: "请解释当前选中图表的内容与逻辑"
+          })
+          .catch(() => undefined);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, pendingIntent]);
 
   const updateDraft = (value: string): void => {
     dispatchComposer({ type: "set-draft", value });
@@ -294,88 +331,182 @@ export function AiWorkspacePanel({
 
   const isGenerating = Boolean(detail?.turns.some((turn) => turn.status === "generating"));
   const selectionAvailable = Boolean(selectionSnapshot?.hasSelection);
+  const showChat = panelView === "chat";
 
   return (
     <aside className={`ai-workspace-panel ${open ? "is-open" : "is-closed"}`} aria-hidden={!open}>
       <header className="ai-workspace-panel__header">
         <div className="ai-workspace-panel__identity">
-          <span className="ai-workspace-panel__mark"><Sparkles size={17} /></span>
-          <div><strong>AI 图表助手</strong><span>工作区会话 · 多模态生成</span></div>
-        </div>
-        <button className="editor-icon-button" type="button" aria-label="关闭 AI 面板" onClick={onClose}><X size={18} /></button>
-      </header>
-      <div className="ai-workspace-panel__body">
-        <AiSessionSidebar
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          renamingSessionId={renamingSessionId}
-          renameDraft={renameDraft}
-          onNew={() => void createSession()}
-          onSelect={(sessionId) => { if (workspaceId) setActiveSession(workspaceId, sessionId); }}
-          onStartRename={(session) => { setRenamingSessionId(session.id); setRenameDraft(session.title); }}
-          onRenameDraftChange={setRenameDraft}
-          onRename={(session) => void renameSession(session)}
-          onCancelRename={() => setRenamingSessionId(null)}
-          onDelete={setDeletingSession}
-        />
-        <section className="ai-conversation-view">
-          <div className="ai-conversation-view__meta">
-            <span>{detail?.title ?? "新对话"}</span>
-            {activeDocument && <small>当前插入目标：{activeDocument.name}</small>}
+          <span className="ai-workspace-panel__mark">
+            <Sparkles size={17} />
+          </span>
+          <div>
+            <strong>AI 图表助手</strong>
+            <span>帮你把想法变成图表</span>
           </div>
-          <div className="ai-turn-list">
-            {detail?.turns.length ? detail.turns.map((turn) => (
-              <AiTurnMessage
-                key={turn.id}
-                turn={turn}
-                activeBridge={activeBridge}
-                activeDocumentId={activeDocument?.id}
-                onBase={() => dispatchComposer({ type: "use-base-turn", turnId: turn.id })}
-                onRepair={(parseError) => void repair(turn.id, turn.prompt, parseError)}
-                onRefresh={() => refreshDetail()}
-              />
-            )) : (
-              <div className="ai-empty-state">
-                <FileImagePlaceholder />
-                <p>描述你想生成的图表，或附加一张截图。</p>
-                <small>生成记录会保存在当前工作区。</small>
+        </div>
+        <div className="ai-workspace-panel__actions">
+          {showChat && (
+            <button
+              className="button button--compact ai-header-new"
+              type="button"
+              onClick={() => void createSession()}
+            >
+              <Plus size={15} />
+              新建对话
+            </button>
+          )}
+          {showChat && (
+            <button
+              className={`editor-icon-button ${historyOpen ? "is-active" : ""}`}
+              type="button"
+              aria-label={historyOpen ? "收起历史" : "展开历史"}
+              aria-pressed={historyOpen}
+              title={historyOpen ? "收起历史" : "展开历史"}
+              onClick={() => setHistoryOpen((value) => !value)}
+            >
+              <History size={17} />
+            </button>
+          )}
+          <button
+            className={`editor-icon-button ${panelView === "settings" ? "is-active" : ""}`}
+            type="button"
+            aria-label="AI 设置"
+            aria-pressed={panelView === "settings"}
+            title="AI 设置"
+            onClick={() => setPanelView(panelView === "settings" ? "chat" : "settings")}
+          >
+            <Settings2 size={17} />
+          </button>
+          <button className="editor-icon-button" type="button" aria-label="关闭 AI 面板" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+      </header>
+      {showChat ? (
+        <div className={`ai-workspace-panel__body ${historyOpen ? "has-history" : "no-history"}`}>
+          {historyOpen && (
+            <AiSessionSidebar
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              renamingSessionId={renamingSessionId}
+              renameDraft={renameDraft}
+              onSelect={(sessionId) => {
+                if (workspaceId) setActiveSession(workspaceId, sessionId);
+              }}
+              onStartRename={(session) => {
+                setRenamingSessionId(session.id);
+                setRenameDraft(session.title);
+              }}
+              onRenameDraftChange={setRenameDraft}
+              onRename={(session) => void renameSession(session)}
+              onCancelRename={() => setRenamingSessionId(null)}
+              onDelete={setDeletingSession}
+            />
+          )}
+          <section className="ai-conversation-view">
+            <div className="ai-turn-list">
+              {detail?.turns.length ? (
+                detail.turns.map((turn) => (
+                  <AiTurnMessage
+                    key={turn.id}
+                    turn={turn}
+                    activeBridge={activeBridge}
+                    activeDocumentId={activeDocument?.id}
+                    selectionAvailable={selectionAvailable}
+                    onBase={() => dispatchComposer({ type: "use-base-turn", turnId: turn.id })}
+                    onRepair={(parseError) => void repair(turn.id, turn.prompt, parseError)}
+                    onRefresh={() => refreshDetail()}
+                  />
+                ))
+              ) : (
+                <div className="ai-empty-state">
+                  <div className="ai-empty-state__avatar" aria-hidden="true">
+                    <Sparkles size={22} />
+                  </div>
+                  <p className="ai-empty-state__greeting">你好！我可以帮你：</p>
+                  <div className="ai-empty-state__suggestions">
+                    {SUGGESTIONS.map((text) => (
+                      <button
+                        key={text}
+                        type="button"
+                        className="ai-suggestion-chip"
+                        onClick={() => updateDraft(text)}
+                      >
+                        <Star size={13} />
+                        <span>{text}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <AiComposer
+              ref={composerRef}
+              draft={draft}
+              busy={busy || isGenerating}
+              hasDetail={Boolean(detail)}
+              selectionAvailable={selectionAvailable}
+              pendingSelection={pendingSelection}
+              pendingSelectionImage={pendingSelectionImage}
+              selectedBaseTurnId={selectedBaseTurnId}
+              pendingImages={pendingImages}
+              onDraftChange={updateDraft}
+              onSend={() => void send()}
+              onAddFiles={(files) => void addFiles(files)}
+              onToggleSelection={() =>
+                dispatchComposer({ type: "use-selection", enabled: !pendingSelection })
+              }
+              onToggleSelectionImage={() =>
+                dispatchComposer({
+                  type: "include-selection-appearance",
+                  enabled: !pendingSelectionImage
+                })
+              }
+              onClearBase={() => dispatchComposer({ type: "use-base-turn" })}
+              onClearSelection={() => dispatchComposer({ type: "use-selection", enabled: false })}
+              onRemoveImage={removeImage}
+            />
+            {panelError && (
+              <div className="ai-panel-error ai-panel-error--global">
+                <AlertCircle size={15} />
+                <span>{panelError}</span>
+                <button type="button" onClick={() => setPanelError(null)}>
+                  <X size={14} />
+                </button>
               </div>
             )}
-          </div>
-          <AiComposer
-            draft={draft}
-            busy={busy || isGenerating}
-            hasDetail={Boolean(detail)}
-            selectionAvailable={selectionAvailable}
-            pendingSelection={pendingSelection}
-            pendingSelectionImage={pendingSelectionImage}
-            selectedBaseTurnId={selectedBaseTurnId}
-            pendingImages={pendingImages}
-            onDraftChange={updateDraft}
-            onSend={() => void send()}
-            onAddFiles={(files) => void addFiles(files)}
-            onToggleSelection={() => dispatchComposer({ type: "use-selection", enabled: !pendingSelection })}
-            onToggleSelectionImage={() => dispatchComposer({ type: "include-selection-appearance", enabled: !pendingSelectionImage })}
-            onClearBase={() => dispatchComposer({ type: "use-base-turn" })}
-            onClearSelection={() => dispatchComposer({ type: "use-selection", enabled: false })}
-            onRemoveImage={removeImage}
-          />
-          {panelError && <div className="ai-panel-error ai-panel-error--global"><AlertCircle size={15} /><span>{panelError}</span><button type="button" onClick={() => setPanelError(null)}><X size={14} /></button></div>}
-        </section>
-      </div>
+          </section>
+        </div>
+      ) : (
+        <div className="ai-workspace-panel__body no-history">
+          <AiSettingsPanel />
+        </div>
+      )}
       {deletingSession && (
         <Modal
           title="删除对话"
           onClose={() => setDeletingSession(null)}
-          footer={<><button className="button" type="button" onClick={() => setDeletingSession(null)}>取消</button><button className="button button--danger" type="button" onClick={() => void deleteSession(deletingSession)}>删除</button></>}
+          footer={
+            <>
+              <button className="button" type="button" onClick={() => setDeletingSession(null)}>
+                取消
+              </button>
+              <button
+                className="button button--danger"
+                type="button"
+                onClick={() => void deleteSession(deletingSession)}
+              >
+                删除
+              </button>
+            </>
+          }
         >
-          <p className="ai-confirm-copy">确定删除“{deletingSession.title}”及其中的生成记录吗？</p>
+          <p className="ai-confirm-copy">
+            确定删除“{deletingSession.title}”及其中的生成记录吗？
+          </p>
         </Modal>
       )}
     </aside>
   );
-}
-
-function FileImagePlaceholder() {
-  return <span className="ai-empty-state__icon" aria-hidden="true">✦</span>;
 }

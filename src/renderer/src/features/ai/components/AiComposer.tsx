@@ -1,8 +1,12 @@
 import { FileImage, Paperclip, ScanLine, Send, X } from "lucide-react";
-import { useRef } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import type { PendingImage } from "../model/composerReducer";
 
 export type { PendingImage } from "../model/composerReducer";
+
+export interface AiComposerHandle {
+  openFilePicker: () => void;
+}
 
 interface AiComposerProps {
   draft: string;
@@ -23,8 +27,43 @@ interface AiComposerProps {
   onRemoveImage: (image: PendingImage) => void;
 }
 
-export function AiComposer({ draft, busy, hasDetail, selectionAvailable, pendingSelection, pendingSelectionImage, selectedBaseTurnId, pendingImages, onDraftChange, onSend, onAddFiles, onToggleSelection, onToggleSelectionImage, onClearBase, onClearSelection, onRemoveImage }: AiComposerProps) {
+export const AiComposer = forwardRef<AiComposerHandle, AiComposerProps>(function AiComposer(
+  {
+    draft,
+    busy,
+    hasDetail,
+    selectionAvailable,
+    pendingSelection,
+    pendingSelectionImage,
+    selectedBaseTurnId,
+    pendingImages,
+    onDraftChange,
+    onSend,
+    onAddFiles,
+    onToggleSelection,
+    onToggleSelectionImage,
+    onClearBase,
+    onClearSelection,
+    onRemoveImage
+  },
+  ref
+) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    openFilePicker: () => fileInputRef.current?.click()
+  }));
+
+  useEffect(() => {
+    if (!previewUrl) return;
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") setPreviewUrl(null);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [previewUrl]);
+
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>): void => {
     const file = Array.from(event.clipboardData.files)[0];
     if (file) {
@@ -33,22 +72,154 @@ export function AiComposer({ draft, busy, hasDetail, selectionAvailable, pending
     }
   };
 
+  const canSend = !busy && Boolean(draft.trim()) && hasDetail;
+  const hasContextChips = Boolean(selectedBaseTurnId || pendingSelection || pendingSelectionImage);
+
   return (
-    <div className="ai-composer" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); onAddFiles(event.dataTransfer.files); }}>
-      <div className="ai-composer__chips">
-        {selectedBaseTurnId && <button type="button" className="ai-context-chip" onClick={onClearBase}>基于历史结果修改 <X size={12} /></button>}
-        {pendingSelection && <button type="button" className="ai-context-chip" onClick={onClearSelection}>参考当前选区 <X size={12} /></button>}
-        {pendingSelectionImage && <span className="ai-context-chip">选区外观</span>}
-        {pendingImages.map((image) => <button type="button" className="ai-context-chip" key={image.previewUrl} onClick={() => onRemoveImage(image)}>{image.fileName}<X size={12} /></button>)}
+    <div
+      className="ai-composer"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        onAddFiles(event.dataTransfer.files);
+      }}
+    >
+      <div className="ai-composer__shell">
+        {pendingImages.length > 0 && (
+          <div className="ai-composer__thumbs">
+            {pendingImages.map((image) => (
+              <div className="ai-attachment-thumb" key={image.previewUrl}>
+                <button
+                  type="button"
+                  className="ai-attachment-thumb__preview"
+                  aria-label={`预览 ${image.fileName}`}
+                  onClick={() => setPreviewUrl(image.previewUrl)}
+                >
+                  <img src={image.previewUrl} alt={image.fileName} />
+                </button>
+                <button
+                  type="button"
+                  className="ai-attachment-thumb__remove"
+                  aria-label={`删除 ${image.fileName}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRemoveImage(image);
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {hasContextChips && (
+          <div className="ai-composer__chips">
+            {selectedBaseTurnId && (
+              <button type="button" className="ai-context-chip" onClick={onClearBase}>
+                基于历史结果修改 <X size={12} />
+              </button>
+            )}
+            {pendingSelection && (
+              <button type="button" className="ai-context-chip" onClick={onClearSelection}>
+                参考当前选区 <X size={12} />
+              </button>
+            )}
+            {pendingSelectionImage && <span className="ai-context-chip">选区外观</span>}
+          </div>
+        )}
+        <textarea
+          value={draft}
+          onChange={(event) => onDraftChange(event.target.value)}
+          onPaste={handlePaste}
+          onKeyDown={(event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+              event.preventDefault();
+              onSend();
+            }
+          }}
+          placeholder="描述你想要的图表…"
+          disabled={busy || !hasDetail}
+        />
+        <div className="ai-composer__footer">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            hidden
+            onChange={(event) => {
+              if (event.target.files) onAddFiles(event.target.files);
+              event.target.value = "";
+            }}
+          />
+          <div className="ai-composer__tools">
+            <button
+              className="ai-composer__tool"
+              type="button"
+              aria-label="上传截图生成图表"
+              title="上传截图生成图表"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy}
+            >
+              <Paperclip size={16} />
+            </button>
+            <button
+              className={`ai-composer__tool ${pendingSelection ? "is-active" : ""}`}
+              type="button"
+              aria-label="选中画布元素作为上下文"
+              title="选中画布元素作为上下文"
+              disabled={!selectionAvailable || busy}
+              onClick={onToggleSelection}
+            >
+              <ScanLine size={16} />
+            </button>
+            {pendingSelection && (
+              <button
+                className={`ai-composer__tool ${pendingSelectionImage ? "is-active" : ""}`}
+                type="button"
+                aria-label="同时参考选区外观"
+                title="同时参考选区外观"
+                disabled={busy}
+                onClick={onToggleSelectionImage}
+              >
+                <FileImage size={16} />
+              </button>
+            )}
+          </div>
+          <button
+            className="ai-composer__send"
+            type="button"
+            aria-label="发送"
+            title="发送 (Ctrl/Cmd + Enter)"
+            disabled={!canSend}
+            onClick={onSend}
+          >
+            <Send size={15} />
+          </button>
+        </div>
       </div>
-      <textarea value={draft} onChange={(event) => onDraftChange(event.target.value)} onPaste={handlePaste} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); onSend(); } }} placeholder="描述要生成或修改的内容…" disabled={busy || !hasDetail} />
-      <div className="ai-composer__footer">
-        <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => { if (event.target.files) onAddFiles(event.target.files); event.target.value = ""; }} />
-        <button className="button button--compact" type="button" aria-label="添加截图" title="添加截图" onClick={() => fileInputRef.current?.click()} disabled={busy}><Paperclip size={15} /></button>
-        <button className={`button button--compact ${pendingSelection ? "is-active" : ""}`} type="button" aria-label="参考当前选区" title="参考当前选区" disabled={!selectionAvailable || busy} onClick={onToggleSelection}><ScanLine size={15} /></button>
-        {pendingSelection && <button className={`button button--compact ${pendingSelectionImage ? "is-active" : ""}`} type="button" aria-label="同时参考选区外观" title="同时参考选区外观" disabled={busy} onClick={onToggleSelectionImage}><FileImage size={15} /></button>}
-        <button className="button button--primary button--compact" type="button" aria-label="发送" title="发送 (Ctrl/Cmd + Enter)" disabled={busy || !draft.trim() || !hasDetail} onClick={onSend}><Send size={15} /></button>
-      </div>
+      {previewUrl && (
+        <div
+          className="ai-image-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="图片预览"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <img
+            src={previewUrl}
+            alt="附件预览"
+            onClick={(event) => event.stopPropagation()}
+          />
+          <button
+            type="button"
+            className="ai-image-lightbox__close"
+            aria-label="关闭预览"
+            onClick={() => setPreviewUrl(null)}
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
     </div>
   );
-}
+});

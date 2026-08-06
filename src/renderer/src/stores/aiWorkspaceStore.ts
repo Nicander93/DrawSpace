@@ -6,25 +6,46 @@ export interface AiCanvasSnapshot {
   hasSelection: boolean;
 }
 
+export type AiPanelView = "chat" | "settings";
+export type AiPendingIntent = "upload" | "explain-selection" | null;
+
 interface AiWorkspaceState {
   panelOpen: boolean;
+  panelView: AiPanelView;
+  pendingIntent: AiPendingIntent;
   activeSessionIdByWorkspace: Record<string, string | undefined>;
   canvasSnapshots: Record<string, AiCanvasSnapshot | undefined>;
   togglePanel: () => void;
-  openPanel: () => void;
+  openPanel: (view?: AiPanelView, intent?: AiPendingIntent) => void;
   closePanel: () => void;
+  setPanelView: (view: AiPanelView) => void;
+  consumePendingIntent: () => AiPendingIntent;
   setActiveSession: (workspaceId: string, sessionId?: string) => void;
   updateCanvasSnapshot: (documentId: string, snapshot: AiCanvasSnapshot) => void;
   removeCanvasSnapshot: (documentId: string) => void;
 }
 
-export const useAiWorkspaceStore = create<AiWorkspaceState>((set) => ({
+export const useAiWorkspaceStore = create<AiWorkspaceState>((set, get) => ({
   panelOpen: false,
+  panelView: "chat",
+  pendingIntent: null,
   activeSessionIdByWorkspace: {},
   canvasSnapshots: {},
-  togglePanel: () => set((state) => ({ panelOpen: !state.panelOpen })),
-  openPanel: () => set({ panelOpen: true }),
-  closePanel: () => set({ panelOpen: false }),
+  togglePanel: () =>
+    set((state) => ({
+      panelOpen: !state.panelOpen,
+      panelView: state.panelOpen ? state.panelView : "chat",
+      pendingIntent: state.panelOpen ? null : state.pendingIntent
+    })),
+  openPanel: (view = "chat", intent = null) =>
+    set({ panelOpen: true, panelView: view, pendingIntent: intent }),
+  closePanel: () => set({ panelOpen: false, pendingIntent: null }),
+  setPanelView: (view) => set({ panelView: view }),
+  consumePendingIntent: () => {
+    const intent = get().pendingIntent;
+    if (intent) set({ pendingIntent: null });
+    return intent;
+  },
   setActiveSession: (workspaceId, sessionId) =>
     set((state) => ({
       activeSessionIdByWorkspace: {

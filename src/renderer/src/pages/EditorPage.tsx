@@ -60,12 +60,11 @@ interface EditorPageProps {
   registerSave?: (documentId: string, save: () => Promise<boolean>) => () => void;
   registerClose?: (documentId: string, close: () => Promise<void>) => () => void;
   registerDiscard?: (documentId: string, discard: () => Promise<void>) => () => void;
-  onOpenAi?: () => void;
   aiPanelOpen?: boolean;
   registerAiBridge?: (documentId: string, bridge: AiCanvasBridge) => () => void;
 }
 
-export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, embedded = false, active = true, onClose, registerSave, registerClose, registerDiscard, onOpenAi, aiPanelOpen = false, registerAiBridge }: EditorPageProps) {
+export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, embedded = false, active = true, onClose, registerSave, registerClose, registerDiscard, aiPanelOpen = false, registerAiBridge }: EditorPageProps) {
   const routeParams = useParams();
   const documentId = embeddedDocumentId ?? routeParams.documentId;
   const location = useLocation();
@@ -77,6 +76,9 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
   const updateDraftStatus = useEditorStore((state) => state.updateDraftStatus);
   const updateCanvasSnapshot = useAiWorkspaceStore((state) => state.updateCanvasSnapshot);
   const removeCanvasSnapshot = useAiWorkspaceStore((state) => state.removeCanvasSnapshot);
+  const hasAiSelection = useAiWorkspaceStore((state) =>
+    documentId ? Boolean(state.canvasSnapshots[documentId]?.hasSelection) : false
+  );
   const { theme } = useTheme();
   const locationState = location.state as EditorLocationState | null;
   const initialContent =
@@ -577,16 +579,32 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
     setExportMenuOpen(false);
   };
 
-  const insertGeneratedDiagram = (diagram: ConvertedMermaidDiagram): void => {
+  const insertGeneratedDiagram = (
+    diagram: ConvertedMermaidDiagram,
+    options?: { mode?: "insert" | "replace" }
+  ): void => {
     const api = excalidrawApiRef.current;
     if (!api) return;
     try {
+      const mode = options?.mode ?? "insert";
       const currentElements = api.getSceneElements();
-      const placedElements = placeGeneratedDiagram(diagram.elements, currentElements, api.getAppState().selectedElementIds);
+      const selectedElementIds = api.getAppState().selectedElementIds;
+      const placedElements = placeGeneratedDiagram(
+        diagram.elements,
+        currentElements,
+        selectedElementIds,
+        mode
+      );
+      const baseElements =
+        mode === "replace"
+          ? currentElements.filter((element) => !selectedElementIds[element.id])
+          : currentElements;
       api.addFiles(Object.values(diagram.files));
       api.updateScene({
-        elements: [...currentElements, ...placedElements],
-        appState: { selectedElementIds: Object.fromEntries(placedElements.map((element) => [element.id, true])) },
+        elements: [...baseElements, ...placedElements],
+        appState: {
+          selectedElementIds: Object.fromEntries(placedElements.map((element) => [element.id, true]))
+        },
         captureUpdate: "IMMEDIATELY"
       });
       setAiInsertError(null);
@@ -774,7 +792,7 @@ export function EditorPage({ documentId: embeddedDocumentId, isDraft = false, em
             }
           }}
         />
-        <AiCanvasTrigger active={aiPanelOpen} onClick={() => onOpenAi?.()} />
+        <AiCanvasTrigger active={aiPanelOpen} hasSelection={hasAiSelection} />
       </div>
       {aiInsertError && <div className="ai-insert-error" role="alert">{aiInsertError}</div>}
       {pendingLeave && document && (
