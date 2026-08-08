@@ -1,4 +1,12 @@
-import { AlertCircle, History, Plus, Settings2, Sparkles, Star, X } from "lucide-react";
+import {
+  AlertCircle,
+  History,
+  PanelLeftClose,
+  Settings2,
+  Sparkles,
+  Star,
+  X
+} from "lucide-react";
 import { useEffect, useReducer, useRef, useState } from "react";
 import type { AiImageUpload, AiSessionDetail, AiSessionSummary, CanvasDocument } from "@shared/types";
 import type { AiCanvasBridge } from "./AiCanvasBridge";
@@ -61,9 +69,11 @@ export function AiWorkspacePanel({
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [deletingSession, setDeletingSession] = useState<AiSessionSummary | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [visionModelConfigured, setVisionModelConfigured] = useState(false);
   const draftTimerRef = useRef<number | undefined>(undefined);
   const composerRef = useRef<AiComposerHandle>(null);
+  const historyToggleRef = useRef<HTMLButtonElement>(null);
 
   const refreshSessions = async (): Promise<void> => {
     if (!workspaceId) return;
@@ -99,6 +109,35 @@ export function AiWorkspacePanel({
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workspaceId]);
+
+  useEffect(() => {
+    if (!open || panelView !== "chat") setHistoryOpen(false);
+  }, [open, panelView]);
+
+  useEffect(() => {
+    if (!open || !historyOpen || panelView !== "chat") return;
+    const closeHistoryOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setHistoryOpen(false);
+        window.setTimeout(() => historyToggleRef.current?.focus(), 0);
+      }
+    };
+    window.addEventListener("keydown", closeHistoryOnEscape);
+    return () => window.removeEventListener("keydown", closeHistoryOnEscape);
+  }, [historyOpen, open, panelView]);
+
+  useEffect(() => {
+    if (!open) return;
+    void window.desktopApi.ai.getSettings()
+      .then((settings) => setVisionModelConfigured(Boolean(settings.visionModel?.trim())))
+      .catch(() => setVisionModelConfigured(false));
+  }, [open, panelView]);
+
+  useEffect(() => {
+    if (!visionModelConfigured && pendingSelectionImage) {
+      dispatchComposer({ type: "include-selection-appearance", enabled: false });
+    }
+  }, [pendingSelectionImage, visionModelConfigured]);
 
   useEffect(() => {
     if (!activeSessionId || !workspaceId) return;
@@ -226,6 +265,10 @@ export function AiWorkspacePanel({
   const addFiles = async (files: FileList | File[]): Promise<void> => {
     const file = Array.from(files)[0];
     if (!file) return;
+    if (!visionModelConfigured) {
+      setPanelError("尚未配置视觉模型。截图理解需要支持图片输入的模型，请先前往 AI 设置配置。");
+      return;
+    }
     if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
       setPanelError("只支持 PNG、JPEG 或 WEBP 图片");
       return;
@@ -257,6 +300,10 @@ export function AiWorkspacePanel({
   const send = async (): Promise<void> => {
     const prompt = draft.trim();
     if (!activeSessionId || !prompt || busy) return;
+    if ((pendingImages.length > 0 || pendingSelectionImage) && !visionModelConfigured) {
+      setPanelError("尚未配置视觉模型。截图理解需要支持图片输入的模型，请先前往 AI 设置配置。");
+      return;
+    }
     const selection = pendingSelection ? activeBridge?.getSelectionContext() : undefined;
     if (pendingSelection && !selection) {
       setPanelError("当前没有可参考的选区");
@@ -342,30 +389,23 @@ export function AiWorkspacePanel({
           </span>
           <div>
             <strong>AI 图表助手</strong>
-            <span>帮你把想法变成图表</span>
+            <span>{activeDocument ? `当前画布：${activeDocument.name}` : "描述想法，生成可编辑图表"}</span>
           </div>
         </div>
         <div className="ai-workspace-panel__actions">
           {showChat && (
             <button
-              className="button button--compact ai-header-new"
+              ref={historyToggleRef}
+              className={`ai-history-toggle ${historyOpen ? "is-active" : ""}`}
               type="button"
-              onClick={() => void createSession()}
-            >
-              <Plus size={15} />
-              新建对话
-            </button>
-          )}
-          {showChat && (
-            <button
-              className={`editor-icon-button ${historyOpen ? "is-active" : ""}`}
-              type="button"
-              aria-label={historyOpen ? "收起历史" : "展开历史"}
-              aria-pressed={historyOpen}
-              title={historyOpen ? "收起历史" : "展开历史"}
+              aria-label={historyOpen ? "收起历史对话" : "历史对话"}
+              aria-controls="ai-conversation-history"
+              aria-expanded={historyOpen}
+              title={historyOpen ? "收起历史对话" : "查看历史对话"}
               onClick={() => setHistoryOpen((value) => !value)}
             >
-              <History size={17} />
+              {historyOpen ? <PanelLeftClose size={16} /> : <History size={16} />}
+              <span>{historyOpen ? "收起" : "历史"}</span>
             </button>
           )}
           <button
@@ -386,23 +426,46 @@ export function AiWorkspacePanel({
       {showChat ? (
         <div className={`ai-workspace-panel__body ${historyOpen ? "has-history" : "no-history"}`}>
           {historyOpen && (
-            <AiSessionSidebar
-              sessions={sessions}
-              activeSessionId={activeSessionId}
-              renamingSessionId={renamingSessionId}
-              renameDraft={renameDraft}
-              onSelect={(sessionId) => {
-                if (workspaceId) setActiveSession(workspaceId, sessionId);
-              }}
-              onStartRename={(session) => {
-                setRenamingSessionId(session.id);
-                setRenameDraft(session.title);
-              }}
-              onRenameDraftChange={setRenameDraft}
-              onRename={(session) => void renameSession(session)}
-              onCancelRename={() => setRenamingSessionId(null)}
-              onDelete={setDeletingSession}
-            />
+            <>
+              <button
+                className="ai-history-backdrop"
+                type="button"
+                aria-label="关闭历史对话"
+                tabIndex={-1}
+                onClick={() => {
+                  setHistoryOpen(false);
+                  window.setTimeout(() => historyToggleRef.current?.focus(), 0);
+                }}
+              />
+              <AiSessionSidebar
+                sessions={sessions}
+                activeSessionId={activeSessionId}
+                renamingSessionId={renamingSessionId}
+                renameDraft={renameDraft}
+                onClose={() => {
+                  setHistoryOpen(false);
+                  window.setTimeout(() => historyToggleRef.current?.focus(), 0);
+                }}
+                onSelect={(sessionId) => {
+                  if (workspaceId) setActiveSession(workspaceId, sessionId);
+                  setHistoryOpen(false);
+                  window.setTimeout(() => composerRef.current?.focus(), 0);
+                }}
+                onStartRename={(session) => {
+                  setRenamingSessionId(session.id);
+                  setRenameDraft(session.title);
+                }}
+                onRenameDraftChange={setRenameDraft}
+                onRename={(session) => void renameSession(session)}
+                onCancelRename={() => setRenamingSessionId(null)}
+                onDelete={setDeletingSession}
+                onCreate={() => {
+                  setHistoryOpen(false);
+                  void createSession();
+                  window.setTimeout(() => composerRef.current?.focus(), 0);
+                }}
+              />
+            </>
           )}
           <section className="ai-conversation-view">
             <div className="ai-turn-list">
@@ -413,7 +476,6 @@ export function AiWorkspacePanel({
                     turn={turn}
                     activeBridge={activeBridge}
                     activeDocumentId={activeDocument?.id}
-                    selectionAvailable={selectionAvailable}
                     onBase={() => dispatchComposer({ type: "use-base-turn", turnId: turn.id })}
                     onRepair={(parseError) => void repair(turn.id, turn.prompt, parseError)}
                     onRefresh={() => refreshDetail()}
@@ -424,7 +486,7 @@ export function AiWorkspacePanel({
                   <div className="ai-empty-state__avatar" aria-hidden="true">
                     <Sparkles size={22} />
                   </div>
-                  <p className="ai-empty-state__greeting">你好！我可以帮你：</p>
+                  <p className="ai-empty-state__greeting">可以从这些开始</p>
                   <div className="ai-empty-state__suggestions">
                     {SUGGESTIONS.map((text) => (
                       <button
@@ -447,6 +509,7 @@ export function AiWorkspacePanel({
               busy={busy || isGenerating}
               hasDetail={Boolean(detail)}
               selectionAvailable={selectionAvailable}
+              visionModelConfigured={visionModelConfigured}
               pendingSelection={pendingSelection}
               pendingSelectionImage={pendingSelectionImage}
               selectedBaseTurnId={selectedBaseTurnId}
@@ -454,15 +517,26 @@ export function AiWorkspacePanel({
               onDraftChange={updateDraft}
               onSend={() => void send()}
               onAddFiles={(files) => void addFiles(files)}
+              onVisionUnavailable={() =>
+                setPanelError("尚未配置视觉模型。截图理解需要支持图片输入的模型，请先前往 AI 设置配置。")
+              }
               onToggleSelection={() =>
                 dispatchComposer({ type: "use-selection", enabled: !pendingSelection })
               }
-              onToggleSelectionImage={() =>
+              onToggleSelectionImage={() => {
+                if (!visionModelConfigured) {
+                  setPanelError("需要先配置视觉模型");
+                  return;
+                }
+                if (pendingImages.length > 0) {
+                  setPanelError("当前一次生成仅支持一张图片");
+                  return;
+                }
                 dispatchComposer({
                   type: "include-selection-appearance",
                   enabled: !pendingSelectionImage
-                })
-              }
+                });
+              }}
               onClearBase={() => dispatchComposer({ type: "use-base-turn" })}
               onClearSelection={() => dispatchComposer({ type: "use-selection", enabled: false })}
               onRemoveImage={removeImage}

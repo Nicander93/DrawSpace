@@ -7,7 +7,7 @@ import type { AppLogger } from "../AppLogger";
 export const DEFAULT_AI_SETTINGS: AiSettings = {
   baseUrl: "http://127.0.0.1:1234/v1",
   model: "ornith-1.0-9b",
-  visionModel: "ornith-1.0-9b",
+  visionModel: undefined,
   temperature: 0.2,
   timeoutMs: 120_000
 };

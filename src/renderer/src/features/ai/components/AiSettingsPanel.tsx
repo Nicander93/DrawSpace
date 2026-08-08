@@ -96,12 +96,13 @@ export function AiSettingsPanel() {
         />
       </label>
       <label className="field">
-        <span>视觉模型（可选）</span>
+        <span>视觉模型</span>
         <input
           value={settings.visionModel ?? ""}
           onChange={(event) => update("visionModel", event.target.value || undefined)}
-          placeholder="默认沿用上面的模型"
+          placeholder="例如：支持图片输入的模型名称"
         />
+        <small>用于截图理解和选区外观参考。未配置时仍可正常使用文本生成，但截图和选区外观功能不可用。</small>
       </label>
       <details className="ai-settings-panel__advanced">
         <summary>高级设置</summary>

@@ -102,6 +102,10 @@ export function SettingsPage() {
       </header>
       <main>
         <aside>
+          <div className="settings-nav__header">
+            <strong>设置</strong>
+            <small>DrawSpace 工作区</small>
+          </div>
           <nav className="settings-nav" aria-label="设置分类">
             <button
               className={activeCategory === "general" ? "is-active" : ""}
@@ -139,9 +143,9 @@ export function SettingsPage() {
                   <input value={aiSettings.model} onChange={(event) => updateAiSetting("model", event.target.value)} placeholder="ornith-1.0-9b" />
                 </label>
                 <label className="field">
-                  <span>视觉模型（可选）</span>
-                  <input value={aiSettings.visionModel ?? ""} onChange={(event) => updateAiSetting("visionModel", event.target.value || undefined)} placeholder="默认沿用上面的模型" />
-                  <small>截图生成需要服务端已加载支持图片输入的模型；不填则沿用文本模型。</small>
+                  <span>视觉模型</span>
+                  <input value={aiSettings.visionModel ?? ""} onChange={(event) => updateAiSetting("visionModel", event.target.value || undefined)} placeholder="例如：支持图片输入的模型名称" />
+                  <small>用于截图理解和选区外观参考。未配置时仍可正常使用文本生成，但截图和选区外观功能不可用。</small>
                 </label>
                 <details className="ai-settings-advanced">
                   <summary>高级设置</summary>

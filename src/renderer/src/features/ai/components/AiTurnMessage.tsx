@@ -1,4 +1,4 @@
-import { AlertCircle, Check, Code2, Copy, FileImage, LoaderCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, Check, Code2, Copy, Download, FileImage, LoaderCircle, PenLine, RefreshCw, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AiTurn } from "@shared/types";
 import type { AiCanvasBridge } from "../AiCanvasBridge";
@@ -8,11 +8,13 @@ const adapter = new MermaidDiagramAdapter();
 const getError = (error: unknown, fallback: string): string =>
   error instanceof Error ? error.message : fallback;
 
+const formatTurnTime = (timestamp: number): string =>
+  new Date(timestamp).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+
 interface AiTurnMessageProps {
   turn: AiTurn;
   activeBridge?: AiCanvasBridge;
   activeDocumentId?: string;
-  selectionAvailable: boolean;
   onBase: () => void;
   onRepair: (parseError: string) => void;
   onRefresh: () => Promise<void>;
@@ -22,7 +24,6 @@ export function AiTurnMessage({
   turn,
   activeBridge,
   activeDocumentId,
-  selectionAvailable,
   onBase,
   onRepair,
   onRefresh
@@ -66,15 +67,15 @@ export function AiTurnMessage({
     return () => URL.revokeObjectURL(url);
   }, [diagram]);
 
-  const insert = async (mode: "insert" | "replace"): Promise<void> => {
+  const insert = async (): Promise<void> => {
     if (!diagram || !activeBridge || !activeDocumentId) return;
     try {
-      activeBridge.insertDiagram(diagram, { mode });
+      activeBridge.insertDiagram(diagram, { mode: "insert" });
       await window.desktopApi.ai.markTurnInserted(turn.id, activeDocumentId);
       await onRefresh();
       setError(null);
     } catch (reason) {
-      setError(getError(reason, mode === "replace" ? "替换选区失败" : "图表插入失败，当前画布未被修改"));
+      setError(getError(reason, "图表插入失败，当前画布未被修改"));
     }
   };
 
@@ -95,6 +96,10 @@ export function AiTurnMessage({
     <article className="ai-turn">
       <div className="ai-msg ai-msg--user">
         <p className="ai-msg__bubble">{turn.prompt}</p>
+        <div className="ai-msg__user-meta">
+          <time dateTime={new Date(turn.createdAt).toISOString()}>{formatTurnTime(turn.createdAt)}</time>
+          <Check size={13} aria-hidden="true" />
+        </div>
         {(turn.context?.selection || turn.attachments.length > 0) && (
           <div className="ai-msg__meta">
             {turn.context?.selection && (
@@ -113,6 +118,11 @@ export function AiTurnMessage({
       </div>
 
       <div className="ai-msg ai-msg--assistant">
+        <div className="ai-msg__assistant-meta">
+          <span className="ai-msg__assistant-mark" aria-hidden="true"><Sparkles size={14} /></span>
+          <strong>AI 助手</strong>
+          <time dateTime={new Date(turn.createdAt).toISOString()}>{formatTurnTime(turn.createdAt)}</time>
+        </div>
         {turn.status === "generating" && (
           <div className="ai-turn-card__loading">
             <LoaderCircle className="is-spinning" size={17} />
@@ -122,7 +132,7 @@ export function AiTurnMessage({
 
         {turn.status === "ready" && (
           <>
-            <p className="ai-msg__reply">已根据你的描述生成图表预览：</p>
+            <p className="ai-msg__reply">已为你生成图表预览如下：</p>
             <div className="ai-preview-card">
               {previewUrl && (
                 <img className="ai-preview-card__image" src={previewUrl} alt="Mermaid 图表预览" />
@@ -132,38 +142,31 @@ export function AiTurnMessage({
                   className="button button--primary button--compact"
                   type="button"
                   disabled={!diagram || !activeBridge || !activeDocumentId}
-                  onClick={() => void insert("insert")}
+                  onClick={() => void insert()}
                 >
-                  插入到画布
+                  <Download size={14} />
+                  放入画布
+                </button>
+                <button className="button button--compact ai-action-secondary" type="button" onClick={onBase}>
+                  <PenLine size={14} />
+                  继续调整
                 </button>
                 <button
-                  className="button button--compact"
-                  type="button"
-                  disabled={!diagram || !activeBridge || !activeDocumentId || !selectionAvailable}
-                  title={selectionAvailable ? "用生成结果替换当前选区" : "请先选中要替换的元素"}
-                  onClick={() => void insert("replace")}
-                >
-                  替换选区
-                </button>
-                <button className="button button--compact" type="button" onClick={onBase}>
-                  基于此修改
-                </button>
-                <button
-                  className="button button--compact"
+                  className="ai-action-link"
                   type="button"
                   disabled={!turn.mermaid}
                   onClick={() => void copyMermaid()}
                 >
                   <Copy size={14} />
-                  {copied ? "已复制" : "复制内容"}
+                  {copied ? "已复制" : "复制 Mermaid"}
                 </button>
                 <button
-                  className="button button--compact ai-preview-card__source-btn"
+                  className="ai-action-link ai-preview-card__source-btn"
                   type="button"
                   onClick={() => setShowSource((value) => !value)}
                 >
                   <Code2 size={14} />
-                  {showSource ? "隐藏" : "源码"}
+                  {showSource ? "收起源码" : "查看源码"}
                 </button>
                 {turn.insertedDocumentId && (
                   <span className="ai-inserted-mark">

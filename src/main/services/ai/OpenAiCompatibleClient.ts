@@ -45,7 +45,10 @@ export class OpenAiCompatibleClient {
     const timer = setTimeout(() => controller.abort(), settings.timeoutMs);
     try {
       const response = await fetch(url, { ...init, signal: controller.signal });
-      if (!response.ok) throw new Error(this.httpError(response.status));
+      if (!response.ok) {
+        const detail = await this.readErrorMessage(response);
+        throw new Error(this.httpError(response.status, detail));
+      }
       try {
         return await response.json();
       } catch {
@@ -60,11 +63,40 @@ export class OpenAiCompatibleClient {
     }
   }
 
-  private httpError(status: number): string {
+  private async readErrorMessage(response: Response): Promise<string | undefined> {
+    try {
+      const body = (await response.text()).trim();
+      if (!body) return undefined;
+      try {
+        const parsed: unknown = JSON.parse(body);
+        if (parsed && typeof parsed === "object") {
+          const error = (parsed as { error?: unknown }).error;
+          if (error && typeof error === "object" && typeof (error as { message?: unknown }).message === "string") {
+            return (error as { message: string }).message.trim() || undefined;
+          }
+          for (const key of ["message", "detail"] as const) {
+            const value = (parsed as Record<string, unknown>)[key];
+            if (typeof value === "string" && value.trim()) return value.trim();
+          }
+        }
+      } catch {
+        return body;
+      }
+    } catch {
+      return undefined;
+    }
+    return undefined;
+  }
+
+  private httpError(status: number, detail?: string): string {
+    if (detail && /does not support image input|image input is not supported/i.test(detail)) {
+      return "当前视觉模型不支持图片输入，请更换支持视觉能力的模型";
+    }
     if (status === 401 || status === 403) return "模型服务拒绝访问";
     if (status === 404) return "模型接口地址不正确";
     if (status === 429) return "模型服务请求过于频繁";
     if (status >= 500) return "模型服务内部错误";
+    if (detail) return `模型服务请求失败：${detail}`;
     return `模型服务请求失败（HTTP ${status}）`;
   }
 

@@ -45,10 +45,21 @@ export class AiConversationService {
     const baseMermaid = request.baseTurnId ? session.turns.find((turn) => turn.id === request.baseTurnId)?.mermaid : undefined;
     if (request.mode === "revise" && !baseMermaid) throw new Error("找不到要修改的 Mermaid 结果");
     const settings = await this.settingsService.get();
-    const modelName = request.images?.length ? (settings.visionModel ?? settings.model) : settings.model;
+    const modelName = this.resolveModel(settings, Boolean(request.images?.length));
     const turn = this.repository.createTurn({ sessionId: request.sessionId, baseTurnId: request.baseTurnId, mode: request.mode, prompt: request.prompt, contextJson: JSON.stringify({ selection: request.selection, attachmentIds: [], capturedAt: Date.now() }), modelName });
     void this.processTurn(turn, request, settings, modelName, baseMermaid, session.id, session.workspaceId);
     return turn;
+  }
+
+  private resolveModel(settings: AiSettings, hasImages: boolean): string {
+    if (!hasImages) return settings.model;
+
+    const visionModel = settings.visionModel?.trim();
+    if (!visionModel) {
+      throw new Error("当前未配置视觉模型，请在设置中配置支持图片输入的模型");
+    }
+
+    return visionModel;
   }
 
   private async processTurn(

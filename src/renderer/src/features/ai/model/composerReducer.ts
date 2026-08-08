@@ -44,7 +44,14 @@ export const aiComposerReducer = (state: AiComposerState, action: AiComposerActi
     case "use-base-turn":
       return { ...state, context: { ...state.context, baseTurnId: action.turnId } };
     case "add-image":
-      return { ...state, context: { ...state.context, images: [action.image] } };
+      return {
+        ...state,
+        context: {
+          ...state.context,
+          includeSelectionAppearance: false,
+          images: [action.image]
+        }
+      };
     case "remove-image":
       return { ...state, context: { ...state.context, images: state.context.images.filter((image) => image !== action.image) } };
     case "reset-after-send":

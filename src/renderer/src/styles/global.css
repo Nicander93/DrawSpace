@@ -2502,6 +2502,326 @@ select {
   background: linear-gradient(135deg, #fffdf4, #fff7db);
 }
 
+/* Settings page — shares the editor's paper, line and soft-blue language. */
+.settings-page {
+  min-height: 100%;
+  background: var(--paper);
+}
+
+.settings-titlebar {
+  height: 60px;
+  background: var(--surface);
+}
+
+.settings-titlebar > button {
+  margin-left: 8px;
+  padding: 0 16px 0 12px;
+  border-right: 1px solid var(--line);
+  color: var(--muted-strong);
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.settings-titlebar > button:hover {
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.settings-titlebar > span {
+  margin-left: 16px;
+  color: var(--ink);
+  font-family: var(--ui-font);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.15px;
+}
+
+.settings-page > main {
+  height: calc(100% - 60px);
+  min-height: 0;
+}
+
+.settings-page > main > aside {
+  width: 248px;
+  padding: 38px 18px 28px;
+  background: var(--surface);
+}
+
+.settings-nav__header {
+  display: grid;
+  gap: 4px;
+  margin: 0 11px 28px;
+}
+
+.settings-nav__header strong {
+  color: var(--ink);
+  font-family: var(--hand-font);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.settings-nav__header small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.settings-nav {
+  gap: 7px;
+}
+
+.settings-page aside button {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--muted-strong);
+  font-size: 13px;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.settings-page aside button:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--blue-soft) 46%, var(--surface));
+}
+
+.settings-page aside button:active {
+  transform: translateY(1px);
+}
+
+.settings-page aside button.is-active {
+  border-color: color-mix(in srgb, var(--blue) 26%, var(--line));
+  color: var(--ink);
+  background: var(--blue-soft);
+  box-shadow: inset 3px 0 var(--blue);
+}
+
+.settings-content {
+  box-sizing: border-box;
+  width: min(940px, calc(100% - 96px));
+  margin: 0;
+  padding: 56px 0 92px 64px;
+}
+
+.settings-content section {
+  max-width: 760px;
+  margin-bottom: 56px;
+  padding-bottom: 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-content section:last-child {
+  border-bottom: 0;
+}
+
+.settings-content h2 {
+  color: var(--ink);
+  font-size: 23px;
+  letter-spacing: -0.3px;
+  text-wrap: balance;
+}
+
+.settings-content section > p {
+  max-width: 62ch;
+  margin: 8px 0 22px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.theme-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.theme-options button {
+  height: 68px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted-strong);
+  background: var(--surface);
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.theme-options button:hover {
+  border-color: color-mix(in srgb, var(--blue) 55%, var(--line));
+  transform: translateY(-1px);
+}
+
+.theme-options button.is-active {
+  border-color: var(--blue);
+  color: var(--ink);
+  background: var(--blue-soft);
+}
+
+.current-workspace {
+  min-height: 76px;
+  padding: 0 15px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.current-workspace > span {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.current-workspace > i {
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--green) 14%, transparent);
+}
+
+.privacy-note {
+  padding: 14px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  color: var(--muted-strong);
+  background: color-mix(in srgb, var(--surface) 72%, var(--paper));
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.settings-section--ai {
+  max-width: 760px;
+}
+
+.ai-settings-form {
+  gap: 18px;
+}
+
+.ai-settings-form .field {
+  gap: 8px;
+}
+
+.ai-settings-form .field > span {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.ai-settings-form .field input {
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.ai-settings-form .field input:hover {
+  border-color: var(--line-strong);
+}
+
+.ai-settings-form .field input:focus {
+  outline: 0;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue-soft) 72%, transparent);
+}
+
+.ai-settings-form .field small {
+  max-width: 68ch;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.ai-settings-advanced {
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.ai-settings-advanced summary {
+  width: fit-content;
+  padding: 4px 0;
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.ai-settings-advanced > div {
+  padding-top: 14px;
+}
+
+.settings-actions {
+  gap: 9px;
+  margin-top: 2px;
+}
+
+.settings-actions .button {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+}
+
+.settings-status {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+}
+
+.settings-page button:focus-visible,
+.settings-page input:focus-visible,
+.settings-page summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+@media (max-width: 820px) {
+  .settings-page > main > aside {
+    width: 196px;
+  }
+
+  .settings-content {
+    width: calc(100% - 48px);
+    padding-left: 36px;
+  }
+}
+
+@media (max-width: 640px) {
+  .settings-page > main {
+    display: block;
+    overflow: auto;
+  }
+
+  .settings-page > main > aside {
+    width: auto;
+    padding: 22px 16px 14px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .settings-nav__header {
+    margin-bottom: 14px;
+  }
+
+  .settings-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-content {
+    width: auto;
+    padding: 34px 20px 64px;
+  }
+
+  .theme-options {
+    grid-template-columns: 1fr;
+  }
+}
+
 .folder-card__preview svg {
   color: inherit;
 }

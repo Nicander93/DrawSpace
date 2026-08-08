@@ -5,6 +5,7 @@ import type { PendingImage } from "../model/composerReducer";
 export type { PendingImage } from "../model/composerReducer";
 
 export interface AiComposerHandle {
+  focus: () => void;
   openFilePicker: () => void;
 }
 
@@ -13,6 +14,7 @@ interface AiComposerProps {
   busy: boolean;
   hasDetail: boolean;
   selectionAvailable: boolean;
+  visionModelConfigured: boolean;
   pendingSelection: boolean;
   pendingSelectionImage: boolean;
   selectedBaseTurnId?: string;
@@ -20,6 +22,7 @@ interface AiComposerProps {
   onDraftChange: (value: string) => void;
   onSend: () => void;
   onAddFiles: (files: FileList | File[]) => void;
+  onVisionUnavailable: () => void;
   onToggleSelection: () => void;
   onToggleSelectionImage: () => void;
   onClearBase: () => void;
@@ -33,6 +36,7 @@ export const AiComposer = forwardRef<AiComposerHandle, AiComposerProps>(function
     busy,
     hasDetail,
     selectionAvailable,
+    visionModelConfigured,
     pendingSelection,
     pendingSelectionImage,
     selectedBaseTurnId,
@@ -40,6 +44,7 @@ export const AiComposer = forwardRef<AiComposerHandle, AiComposerProps>(function
     onDraftChange,
     onSend,
     onAddFiles,
+    onVisionUnavailable,
     onToggleSelection,
     onToggleSelectionImage,
     onClearBase,
@@ -49,9 +54,11 @@ export const AiComposer = forwardRef<AiComposerHandle, AiComposerProps>(function
   ref
 ) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useImperativeHandle(ref, () => ({
+    focus: () => textareaRef.current?.focus(),
     openFilePicker: () => fileInputRef.current?.click()
   }));
 
@@ -108,6 +115,7 @@ export const AiComposer = forwardRef<AiComposerHandle, AiComposerProps>(function
                 >
                   <X size={12} />
                 </button>
+                <span className="ai-attachment-thumb__name" title={image.fileName}>{image.fileName}</span>
               </div>
             ))}
           </div>
@@ -124,10 +132,15 @@ export const AiComposer = forwardRef<AiComposerHandle, AiComposerProps>(function
                 参考当前选区 <X size={12} />
               </button>
             )}
-            {pendingSelectionImage && <span className="ai-context-chip">选区外观</span>}
+            {pendingSelectionImage && (
+              <button type="button" className="ai-context-chip" onClick={onToggleSelectionImage}>
+                选区外观 <X size={12} />
+              </button>
+            )}
           </div>
         )}
         <textarea
+          ref={textareaRef}
           value={draft}
           onChange={(event) => onDraftChange(event.target.value)}
           onPaste={handlePaste}
@@ -156,8 +169,15 @@ export const AiComposer = forwardRef<AiComposerHandle, AiComposerProps>(function
               className="ai-composer__tool"
               type="button"
               aria-label="上传截图生成图表"
-              title="上传截图生成图表"
-              onClick={() => fileInputRef.current?.click()}
+              aria-disabled={!visionModelConfigured}
+              title={visionModelConfigured ? "上传截图生成图表" : "需要先配置视觉模型"}
+              onClick={() => {
+                if (!visionModelConfigured) {
+                  onVisionUnavailable();
+                  return;
+                }
+                fileInputRef.current?.click();
+              }}
               disabled={busy}
             >
               <Paperclip size={16} />
@@ -177,8 +197,12 @@ export const AiComposer = forwardRef<AiComposerHandle, AiComposerProps>(function
                 className={`ai-composer__tool ${pendingSelectionImage ? "is-active" : ""}`}
                 type="button"
                 aria-label="同时参考选区外观"
-                title="同时参考选区外观"
-                disabled={busy}
+                title={!visionModelConfigured
+                  ? "需要先配置视觉模型"
+                  : pendingImages.length > 0
+                    ? "当前一次生成仅支持一张图片"
+                    : "同时参考选区外观"}
+                disabled={busy || !visionModelConfigured || pendingImages.length > 0}
                 onClick={onToggleSelectionImage}
               >
                 <FileImage size={16} />

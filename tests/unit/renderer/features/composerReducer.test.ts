@@ -21,4 +21,20 @@ describe("aiComposerReducer", () => {
     expect(state.context.baseTurnId).toBeUndefined();
     expect(state.context.useSelection).toBe(false);
   });
+
+  it("replaces selection appearance with an uploaded image", () => {
+    const withSelection = aiComposerReducer(initialAiComposerState, { type: "use-selection", enabled: true });
+    const withAppearance = aiComposerReducer(withSelection, { type: "include-selection-appearance", enabled: true });
+    const image = {
+      fileName: "flow.png",
+      mimeType: "image/png" as const,
+      data: new ArrayBuffer(8),
+      previewUrl: "blob:flow"
+    };
+    const withImage = aiComposerReducer(withAppearance, { type: "add-image", image });
+
+    expect(withImage.context.images).toEqual([image]);
+    expect(withImage.context.includeSelectionAppearance).toBe(false);
+    expect(withImage.context.useSelection).toBe(true);
+  });
 });
