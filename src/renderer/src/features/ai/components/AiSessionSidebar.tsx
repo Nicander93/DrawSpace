@@ -25,7 +25,7 @@ function startOfDay(ts: number): number {
 function groupSessions(sessions: AiSessionSummary[]): SessionGroup[] {
   const today = startOfDay(Date.now());
   const yesterday = today - 86400000;
-  const buckets: SessionGroup[] = [
+  const buckets: [SessionGroup, SessionGroup, SessionGroup] = [
     { label: "今天", items: [] },
     { label: "昨天", items: [] },
     { label: "更早", items: [] }
