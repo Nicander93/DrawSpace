@@ -17,6 +17,7 @@
   --shadow: 0 16px 38px rgb(40 36 28 / 9%);
   --hand-font: "LXGW WenKai", "霞鹜文楷", "STKaiti", "KaiTi", cursive;
   --ui-font: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --ui-scale: 1;
 }
 
 :root[data-theme="dark"] {
@@ -40,10 +41,14 @@
 html,
 body,
 #root {
-  width: 100%;
-  height: 100%;
+  width: calc(100% / var(--ui-scale));
+  height: calc(100% / var(--ui-scale));
   margin: 0;
   overflow: hidden;
+}
+
+#root {
+  zoom: var(--ui-scale);
 }
 
 body {
@@ -2009,6 +2014,60 @@ select {
 .theme-options button.is-active {
   border-color: var(--blue);
   background: var(--blue-soft);
+}
+
+.settings-section-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.settings-section-heading > div {
+  min-width: 0;
+}
+
+.settings-section-heading > div > p {
+  margin-bottom: 18px;
+}
+
+.font-size-value {
+  min-width: 52px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--muted-strong);
+  background: var(--surface-strong);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.font-size-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--muted-strong);
+  background: var(--surface-strong);
+}
+
+.font-size-control input {
+  width: 100%;
+  height: 5px;
+  margin: 0;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+
+.font-size-range-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 2px 0;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .current-workspace {

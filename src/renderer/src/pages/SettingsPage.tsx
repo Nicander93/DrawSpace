@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Check,
+  Type,
   FolderOpen,
   HardDrive,
   Moon,
@@ -24,7 +25,7 @@ type SettingsCategory = "general" | "ai";
 export function SettingsPage() {
   const navigate = useNavigate();
   const { workspace, chooseWorkspace } = useWorkspaceStore();
-  const { preference, setPreference } = useTheme();
+  const { preference, fontSize, setPreference, setFontSize } = useTheme();
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>("general");
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [aiStatus, setAiStatus] = useState<AiSettingsStatus>("loading");
@@ -184,6 +185,36 @@ export function SettingsPage() {
                   {preference === value && <Check size={16} />}
                 </button>
               ))}
+            </div>
+          </section>
+
+          <section>
+            <div className="settings-section-heading">
+              <div>
+                <h2>字体大小</h2>
+                <p>调整 DrawSpace 界面的显示大小，设置会自动保存。</p>
+              </div>
+              <output className="font-size-value" htmlFor="font-size">{fontSize}%</output>
+            </div>
+            <div className="font-size-control">
+              <Type size={16} aria-hidden="true" />
+              <input
+                id="font-size"
+                type="range"
+                min="80"
+                max="130"
+                step="1"
+                value={fontSize}
+                aria-label="字体大小"
+                aria-valuetext={`${fontSize}%`}
+                onChange={(event) => setFontSize(Number(event.target.value))}
+              />
+              <Type size={22} aria-hidden="true" />
+            </div>
+            <div className="font-size-range-labels" aria-hidden="true">
+              <span>小</span>
+              <span>默认</span>
+              <span>大</span>
             </div>
           </section>
 
