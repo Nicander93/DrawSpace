@@ -88,7 +88,8 @@ const desktopApi: DesktopApi = {
   window: {
     minimize: () => ipcRenderer.send(IPC_CHANNELS.windowMinimize),
     maximize: () => ipcRenderer.send(IPC_CHANNELS.windowMaximize),
-    close: () => ipcRenderer.send(IPC_CHANNELS.windowClose)
+    close: () => ipcRenderer.send(IPC_CHANNELS.windowClose),
+    setZoomFactor: (factor) => ipcRenderer.send(IPC_CHANNELS.windowSetZoomFactor, factor)
   },
   lifecycle: {
     onCloseRequested: (listener) => {

@@ -117,7 +117,7 @@ test("AI workspace keeps visual inputs gated and visually integrated", async () 
     await expect(page.locator(".workspace-page")).toBeVisible();
     await page.getByRole("button", { name: "设置", exact: true }).click();
     await expect(page.locator(".settings-page")).toBeVisible();
-    await page.getByRole("button", { name: "AI 图表", exact: true }).click();
+    await page.getByRole("button", { name: "AI", exact: true }).click();
     await expect(page.getByPlaceholder("例如：支持图片输入的模型名称")).toBeVisible();
     if (process.env.DRAWSPACE_SETTINGS_SCREENSHOT) {
       await page.screenshot({ path: process.env.DRAWSPACE_SETTINGS_SCREENSHOT, fullPage: true });

@@ -22,4 +22,11 @@ export const registerWindowHandlers = (): void => {
   ipcMain.on(IPC_CHANNELS.windowClose, (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();
   });
+
+  ipcMain.on(IPC_CHANNELS.windowSetZoomFactor, (event, factor: unknown) => {
+    if (typeof factor !== "number" || !Number.isFinite(factor) || factor < 0.8 || factor > 1.3) {
+      return;
+    }
+    BrowserWindow.fromWebContents(event.sender)?.webContents.setZoomFactor(factor);
+  });
 };

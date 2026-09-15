@@ -17,7 +17,6 @@
   --shadow: 0 16px 38px rgb(40 36 28 / 9%);
   --hand-font: "LXGW WenKai", "霞鹜文楷", "STKaiti", "KaiTi", cursive;
   --ui-font: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --ui-scale: 1;
 }
 
 :root[data-theme="dark"] {
@@ -41,14 +40,10 @@
 html,
 body,
 #root {
-  width: calc(100% / var(--ui-scale));
-  height: calc(100% / var(--ui-scale));
+  width: 100%;
+  height: 100%;
   margin: 0;
   overflow: hidden;
-}
-
-#root {
-  zoom: var(--ui-scale);
 }
 
 body {
@@ -2397,7 +2392,66 @@ select {
 }
 
 /* unified-editor-titlebar */
-.editor-workspace__titlebar{height:44px;flex:none;display:flex;align-items:stretch;overflow:hidden;border-bottom:1px solid var(--line);background:var(--surface);-webkit-app-region:drag}.editor-workspace__titlebar>.brand{max-width:190px;flex:none;padding:0 12px;border-right:1px solid var(--line)}.editor-workspace__titlebar .editor-workspace__back{flex:none;margin:6px 4px;padding:0 8px;-webkit-app-region:no-drag}.editor-workspace__titlebar .editor-tabs{min-width:0;height:44px;flex:1;padding:5px 4px 0;border-bottom:0;background:transparent;overflow-x:auto;overflow-y:hidden;-webkit-app-region:no-drag}.editor-workspace__titlebar .editor-workspace__save-status{flex:none;margin-left:0;padding:0 10px;font-size:11px;white-space:nowrap;-webkit-app-region:no-drag}.editor-workspace__titlebar .window-controls{height:44px;flex:none}.editor-workspace__titlebar .editor-tab{min-width:112px;max-width:210px}.editor-workspace__titlebar .editor-tabs__add{min-width:32px;max-width:32px}
+.editor-workspace__titlebar {
+  height: 44px;
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  -webkit-app-region: drag;
+}
+
+.editor-workspace__titlebar > .brand {
+  max-width: 190px;
+  flex: none;
+  padding: 0 12px;
+  border-right: 1px solid var(--line);
+}
+
+.editor-workspace__titlebar .editor-workspace__back {
+  flex: none;
+  margin: 6px 4px;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+}
+
+.editor-workspace__titlebar .editor-tabs {
+  min-width: 0;
+  height: 44px;
+  flex: 1;
+  padding: 0 4px;
+  border-bottom: 0;
+  background: transparent;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-app-region: no-drag;
+}
+
+.editor-workspace__titlebar .editor-workspace__save-status {
+  flex: none;
+  margin-left: 0;
+  padding: 0 10px;
+  font-size: 11px;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+
+.editor-workspace__titlebar .window-controls {
+  height: 44px;
+  flex: none;
+}
+
+.editor-workspace__titlebar .editor-tab {
+  min-width: 112px;
+  max-width: 210px;
+}
+
+.editor-workspace__titlebar .editor-tabs__add {
+  min-width: 32px;
+  max-width: 32px;
+}
 
 /* minimal-shell-overrides */
 .welcome-page{background:var(--paper)}.welcome-titlebar{align-items:center;border-bottom:1px solid var(--line);background:var(--surface)}.welcome-titlebar>.brand{position:static;margin:0;padding:0 12px}.welcome-page h1{font-family:inherit;font-size:24px;letter-spacing:0}.workspace-page{background:var(--paper)}.workspace-sidebar{background:var(--surface);background-size:auto}.workspace-main--home .quick-actions{margin-top:0}.welcome-option{border-width:1px;border-radius:10px;box-shadow:none}.welcome-option:hover{transform:none;background:rgb(127 127 127 / 5%)}
@@ -2597,9 +2651,14 @@ select {
 .settings-page > main {
   height: calc(100% - 60px);
   min-height: 0;
+  overflow-y: auto;
 }
 
 .settings-page > main > aside {
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: calc(100vh - 60px);
   width: 248px;
   padding: 38px 18px 28px;
   background: var(--surface);
@@ -2659,8 +2718,10 @@ select {
 
 .settings-content {
   box-sizing: border-box;
+  align-self: flex-start;
   width: min(940px, calc(100% - 96px));
   margin: 0;
+  overflow: visible;
   padding: 56px 0 92px 64px;
 }
 

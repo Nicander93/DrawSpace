@@ -124,13 +124,13 @@ export function SettingsPage() {
               onClick={() => setActiveCategory("ai")}
             >
               <Sparkles size={17} />
-              AI 图表
+              AI
             </button>
           </nav>
         </aside>
         <div className="settings-content">
           {activeCategory === "ai" && <section className="settings-section--ai">
-            <h2>AI 图表</h2>
+            <h2>AI</h2>
             <p>通过本地或兼容 OpenAI API 的模型，将自然语言转换为可编辑 Mermaid 图表。</p>
             {aiSettings && (
               <div className="ai-settings-form">

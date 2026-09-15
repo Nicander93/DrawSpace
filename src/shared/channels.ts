@@ -32,6 +32,7 @@ export const IPC_CHANNELS = {
   windowMinimize: "window:minimize",
   windowMaximize: "window:maximize",
   windowClose: "window:close",
+  windowSetZoomFactor: "window:set-zoom-factor",
   appCloseRequested: "app:close-requested",
   appCloseResponded: "app:close-responded",
   aiGetSettings: "ai:get-settings",

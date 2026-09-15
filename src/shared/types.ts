@@ -348,6 +348,7 @@ export interface DesktopApi {
     minimize(): void;
     maximize(): void;
     close(): void;
+    setZoomFactor(factor: number): void;
   };
   lifecycle: {
     onCloseRequested(listener: (request: AppCloseRequest) => void): () => void;

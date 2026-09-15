@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-09-15
+
+### Fixed
+
+- 改用 Electron 原生页面缩放，修复缩放后窗口关闭、设置入口消失，以及 Excalidraw 偶发无法拖动的问题。
+- 修复设置页滚动条出现在内容区中间的问题；滚动条现固定在窗口右侧，左侧导航保持可见。
+- 修复编辑器顶部“工作区”与画布标签的垂直对齐问题。
+
+### Changed
+
+- 设置页中的“AI 图表”更名为“AI”。
+
 ### Changed
 
 - 去掉坚果云作为独立工作区类型的 UI 与入口；当前统一为本地目录工作区（同步盘目录仍可直接选用）。
@@ -26,6 +38,7 @@
 - 自动保存、冲突处理、恢复快照和缩略图。
 - Windows 托盘、自定义标题栏与 NSIS 打包配置。
 
-[Unreleased]: https://github.com/Nicander93/DrawSpace/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/Nicander93/DrawSpace/compare/v0.1.13...HEAD
+[0.1.13]: https://github.com/Nicander93/DrawSpace/compare/v0.1.12...v0.1.13
 [0.1.5]: https://github.com/Nicander93/DrawSpace/compare/v0.1.4...v0.1.5
 [0.1.0]: https://github.com/Nicander93/DrawSpace/releases/tag/v0.1.0

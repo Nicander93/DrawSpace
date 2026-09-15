@@ -46,7 +46,7 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   }, [theme]);
 
   useEffect(() => {
-    document.documentElement.style.setProperty("--ui-scale", String(fontSize / 100));
+    window.desktopApi.window.setZoomFactor(fontSize / 100);
   }, [fontSize]);
 
   useEffect(() => {
